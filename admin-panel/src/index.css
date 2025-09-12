@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1;
+}
+
+/* Custom utility classes */
+@layer components {
+  .btn-primary {
+    @apply bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .card {
+    @apply bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden;
+  }
+
+  .loading-spinner {
+    @apply animate-spin rounded-full h-4 w-4 border-b-2 border-current;
+  }
+}
+
+/* Admin specific styles */
+.admin-sidebar {
+  @apply fixed left-0 top-0 h-full w-64 bg-gray-900 text-white transform transition-transform duration-300 ease-in-out z-50;
+}
+
+.admin-main {
+  @apply ml-64 min-h-screen transition-all duration-300 ease-in-out;
+}
+
+.admin-header {
+  @apply bg-white shadow-md border-b border-gray-200 px-6 py-4;
+}
+
+.admin-content {
+  @apply p-6;
+}
+
+@media (max-width: 768px) {
+  .admin-sidebar {
+    @apply -translate-x-full;
+  }
+  
+  .admin-main {
+    @apply ml-0;
+  }
+  
+  .admin-sidebar.open {
+    @apply translate-x-0;
+  }
+}

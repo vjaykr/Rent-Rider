@@ -1,0 +1,27 @@
+{
+  "name": "rentrider",
+  "version": "1.0.0",
+  "description": "Bike rental platform with customer, owner, and admin interfaces",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run server:dev\" \"npm run client:dev\" \"npm run admin:dev\"",
+    "server:dev": "cd server && PORT=5001 npm run dev",
+    "client:dev": "cd client && npm start",
+    "admin:dev": "cd admin-panel && npm start",
+    "install:all": "npm install && cd client && npm install && cd ../admin-panel && npm install && cd ../server && npm install",
+    "build": "cd client && npm run build && cd ../admin-panel && npm run build",
+    "start": "cd server && npm start"
+  },
+  "keywords": [
+    "bike-rental",
+    "react",
+    "nodejs",
+    "mongodb",
+    "express"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^7.6.0"
+  }
+}
