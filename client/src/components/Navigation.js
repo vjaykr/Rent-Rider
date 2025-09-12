@@ -80,7 +80,7 @@ const Navigation = () => {
           <div className="flex-shrink-0">
             <Link to="/" className="flex items-center">
               <img 
-                src="/images/logo.jpg" 
+                src="/images/logo.png" 
                 alt="RentRider Logo" 
                 className="h-12 w-auto object-contain"
               />
