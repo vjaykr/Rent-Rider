@@ -317,47 +317,44 @@ const Home = () => {
                   <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-2 text-left">
                     Search Location
                   </label>
-                  <div className="relative">
-                    <input
-                      ref={inputRef}
-                      type="text"
-                      id="location"
-                      value={searchLocation}
-                      onChange={(e) => setSearchLocation(e.target.value)}
-                      placeholder="Enter city, area, or landmark (e.g., Mumbai, Andheri, Gateway of India)"
-                      className="w-full px-4 py-3 pl-12 pr-32 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-500"
-                    />
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center">
-                      <svg className="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <LocationAutocomplete
+                        placeholder="Enter city, area, or landmark"
+                        onLocationSelect={(location) => {
+                          setSearchLocation(location.address);
+                          if (location.coordinates) {
+                            setCurrentPosition({
+                              latitude: location.coordinates[1],
+                              longitude: location.coordinates[0]
+                            });
+                          }
+                        }}
+                      />
                     </div>
                     <button
                       type="button"
                       onClick={getCurrentLocation}
                       disabled={isGettingLocation}
-                      className={`absolute inset-y-0 right-0 pr-3 flex items-center text-sm transition-colors ${
+                      className={`px-4 py-3 border border-gray-300 rounded-lg text-sm font-medium transition-colors ${
                         isGettingLocation 
-                          ? 'text-gray-400 cursor-not-allowed' 
-                          : 'text-blue-600 hover:text-blue-800'
+                          ? 'text-gray-400 cursor-not-allowed bg-gray-100' 
+                          : 'text-blue-600 hover:text-blue-800 hover:bg-blue-50'
                       }`}
                     >
                       {isGettingLocation ? (
                         <>
-                          <svg className="animate-spin h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24">
+                          <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                           </svg>
-                          Loading...
                         </>
                       ) : (
                         <>
-                          <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                           </svg>
-                          Current
                         </>
                       )}
                     </button>
@@ -401,7 +398,28 @@ const Home = () => {
                     <button
                       key={city}
                       type="button"
-                      onClick={() => setSearchLocation(city)}
+                      onClick={() => {
+                        setSearchLocation(city);
+                        // Trigger a search for the city to get coordinates
+                        const searchCity = async () => {
+                          try {
+                            const response = await fetch(
+                              `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(city)}&apiKey=c829ceacd98e40868eee125bfbca6624`
+                            );
+                            const data = await response.json();
+                            if (data.features && data.features.length > 0) {
+                              const coords = data.features[0].geometry.coordinates;
+                              setCurrentPosition({
+                                latitude: coords[1],
+                                longitude: coords[0]
+                              });
+                            }
+                          } catch (error) {
+                            console.error('Error geocoding city:', error);
+                          }
+                        };
+                        searchCity();
+                      }}
                       className="px-3 py-1 text-xs bg-green-400 text-gray-700 rounded-full hover:bg-gray-200 transition-colors"
                     >
                       {city}

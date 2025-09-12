@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-const LocationAutocomplete = ({ onLocationSelect, placeholder = "Enter location..." }) => {
+const LocationAutocompleteFixed = ({ onLocationSelect, placeholder = "Enter location..." }) => {
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -8,7 +8,7 @@ const LocationAutocomplete = ({ onLocationSelect, placeholder = "Enter location.
   const inputRef = useRef(null);
   const debounceRef = useRef(null);
 
-  const API_KEY = 'c829ceacd98e40868eee125bfbca6624';
+  const API_KEY = 'c829ceacd98e40868eee125bfbca6624'; // Direct API key
 
   const searchPlaces = async (searchQuery) => {
     if (!searchQuery.trim() || searchQuery.length < 2) {
@@ -17,9 +17,11 @@ const LocationAutocomplete = ({ onLocationSelect, placeholder = "Enter location.
     }
 
     setIsLoading(true);
+    console.log('Searching for:', searchQuery); // Debug log
     
     try {
       const url = `https://api.geoapify.com/v1/geocode/autocomplete?text=${encodeURIComponent(searchQuery)}&apiKey=${API_KEY}`;
+      console.log('API URL:', url); // Debug log
       
       const response = await fetch(url);
       
@@ -28,6 +30,8 @@ const LocationAutocomplete = ({ onLocationSelect, placeholder = "Enter location.
       }
       
       const data = await response.json();
+      console.log('API Response:', data); // Debug log
+      
       setSuggestions(data.features || []);
       setShowSuggestions(true);
     } catch (error) {
@@ -43,10 +47,12 @@ const LocationAutocomplete = ({ onLocationSelect, placeholder = "Enter location.
     setQuery(value);
     setShowSuggestions(true);
 
+    // Clear previous timeout
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
     
+    // Debounce API calls
     debounceRef.current = setTimeout(() => {
       searchPlaces(value);
     }, 500);
@@ -91,14 +97,12 @@ const LocationAutocomplete = ({ onLocationSelect, placeholder = "Enter location.
           value={query}
           onChange={handleInputChange}
           placeholder={placeholder}
-          className="w-full px-4 py-3 pl-12 pr-20 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-500"
+          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
-        <div className="absolute inset-y-0 left-0 pl-3 flex items-center">
-          <svg className="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-        </div>
+        <svg className="absolute right-3 top-3 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
       </div>
 
       {showSuggestions && query.length > 1 && (
@@ -135,4 +139,4 @@ const LocationAutocomplete = ({ onLocationSelect, placeholder = "Enter location.
   );
 };
 
-export default LocationAutocomplete;
+export default LocationAutocompleteFixed;
