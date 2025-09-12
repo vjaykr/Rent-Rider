@@ -1,7 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import LegalModal from './LegalModal';
 
 const Footer = () => {
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showCookieModal, setShowCookieModal] = useState(false);
   return (
     <footer className="bg-gradient-to-br from-purple-800 via-indigo-800 to-blue-800 text-white p-8 shadow-[inset_0_1px_2px_rgba(255,255,255,0.1),_0_8px_20px_rgba(0,0,0,0.4)] rounded-t-xl backdrop-blur-md border-t border-white/20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -113,14 +117,20 @@ const Footer = () => {
                 </a>
               </li>
               <li>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
+                <button 
+                  onClick={() => setShowTermsModal(true)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
                   Terms of Service
-                </a>
+                </button>
               </li>
               <li>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
+                <button 
+                  onClick={() => setShowPrivacyModal(true)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
                   Privacy Policy
-                </a>
+                </button>
               </li>
             </ul>
           </div>
@@ -133,19 +143,49 @@ const Footer = () => {
               © 2025 Rydigo. All rights reserved.
             </p>
             <div className="flex space-x-6 mt-4 md:mt-0">
-              <a href="#" className="text-gray-400 hover:text-white text-sm transition-colors">
+              <button 
+                onClick={() => setShowPrivacyModal(true)}
+                className="text-gray-400 hover:text-white text-sm transition-colors"
+              >
                 Privacy Policy
-              </a>
-              <a href="#" className="text-gray-400 hover:text-white text-sm transition-colors">
+              </button>
+              <button 
+                onClick={() => setShowTermsModal(true)}
+                className="text-gray-400 hover:text-white text-sm transition-colors"
+              >
                 Terms of Service
-              </a>
-              <a href="#" className="text-gray-400 hover:text-white text-sm transition-colors">
+              </button>
+              <button 
+                onClick={() => setShowCookieModal(true)}
+                className="text-gray-400 hover:text-white text-sm transition-colors"
+              >
                 Cookie Policy
-              </a>
+              </button>
             </div>
           </div>
         </div>
       </div>
+      
+      <LegalModal 
+        isOpen={showPrivacyModal} 
+        onClose={() => setShowPrivacyModal(false)}
+        type="privacy"
+        title="Privacy Policy"
+      />
+      
+      <LegalModal 
+        isOpen={showTermsModal} 
+        onClose={() => setShowTermsModal(false)}
+        type="terms"
+        title="Terms of Service"
+      />
+      
+      <LegalModal 
+        isOpen={showCookieModal} 
+        onClose={() => setShowCookieModal(false)}
+        type="cookies"
+        title="Cookie Policy"
+      />
     </footer>
   );
 };
