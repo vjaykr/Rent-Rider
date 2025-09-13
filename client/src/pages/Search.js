@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import LocationAutocomplete from '../components/LocationAutocomplete';
 
 const Search = () => {
   const [filters, setFilters] = useState({
@@ -15,6 +16,13 @@ const Search = () => {
     setFilters({
       ...filters,
       [e.target.name]: e.target.value
+    });
+  };
+
+  const handleLocationSelect = (locationData) => {
+    setFilters({
+      ...filters,
+      location: locationData.address
     });
   };
 
@@ -64,17 +72,12 @@ const Search = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Location */}
               <div>
-                <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Location
                 </label>
-                <input
-                  type="text"
-                  id="location"
-                  name="location"
-                  value={filters.location}
-                  onChange={handleFilterChange}
+                <LocationAutocomplete
+                  onLocationSelect={handleLocationSelect}
                   placeholder="Enter city or area"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
 
