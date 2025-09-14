@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { secureAuthService } from '../services/secureAuthService';
 import { auth, onAuthStateChange } from '../config/firebase';
+import { showToast } from '../components/CustomToast';
+import toast from 'react-hot-toast';
 
 // Initial state
 const initialState = {
@@ -117,10 +119,6 @@ export const SecureAuthProvider = ({ children }) => {
     };
 
     initializeAuth();
-    
-    // Auto-refresh user data every 5 minutes
-    const interval = setInterval(initializeAuth, 5 * 60 * 1000);
-    return () => clearInterval(interval);
   }, []);
 
   // Listen for logout and auth update events
@@ -208,6 +206,7 @@ export const SecureAuthProvider = ({ children }) => {
           type: AUTH_ACTIONS.PROFILE_COMPLETE,
           payload: { user: response.user }
         });
+        showToast.success('Profile completed successfully!');
         return { success: true, user: response.user };
       } else {
         dispatch({ type: AUTH_ACTIONS.SET_ERROR, payload: response.message });
@@ -255,8 +254,11 @@ export const SecureAuthProvider = ({ children }) => {
       if (response.success) {
         // Force immediate state update
         dispatch({ type: AUTH_ACTIONS.LOGIN_SUCCESS, payload: { user: response.user } });
-        // Emit event with user data to update navbar immediately
-        window.dispatchEvent(new CustomEvent('profile:updated', { detail: { user: response.user } }));
+        // Emit event to update navbar immediately
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('profile:updated'));
+        }, 100);
+        showToast.success('Profile updated successfully!');
         return response;
       } else {
         dispatch({ type: AUTH_ACTIONS.SET_ERROR, payload: response.message });
@@ -280,6 +282,14 @@ export const SecureAuthProvider = ({ children }) => {
       } catch (firebaseError) {
         console.error('Firebase signout error:', firebaseError);
       }
+      
+      toast.success('Logged out', {
+        duration: 2000,
+        style: {
+          fontSize: '14px',
+          padding: '8px 12px'
+        }
+      });
     } catch (error) {
       console.error('Logout error:', error);
     } finally {

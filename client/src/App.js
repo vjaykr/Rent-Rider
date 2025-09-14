@@ -1,195 +1,104 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, lazy } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
+import { EnhancedToaster } from './components/CustomToast';
 import { useSecureAuth } from './context/SecureAuthContext';
-
-// Components
+import { PageLoader } from './components/LoadingSpinner';
 import Navigation from './components/Navigation';
 import Footer from './components/Footer';
-import LoadingSpinner from './components/LoadingSpinner';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import ErrorBoundary from './components/ErrorBoundary';
+import './styles/animations.css';
 
-
-
-// Layouts
-import OwnerLayout from './layouts/OwnerLayout';
-
-// Pages (Lazy loaded for better performance)
-const Home = React.lazy(() => import('./pages/Home/Home'));
-const HowItWorks = React.lazy(() => import('./pages/HowItWorks'));
-const About = React.lazy(() => import('./pages/About'));
-const Contact = React.lazy(() => import('./pages/Contact'));
-const Search = React.lazy(() => import('./pages/Search'));
-const Wallet = React.lazy(() => import('./pages/Wallet'));
-const Support = React.lazy(() => import('./pages/Support'));
-const Earnings = React.lazy(() => import('./pages/Earnings'));
-const Login = React.lazy(() => import('./components/auth/SecureLoginForm'));
-const ProfileCompletion = React.lazy(() => import('./components/auth/ProfileCompletion'));
-const ForgotPassword = React.lazy(() => import('./pages/Auth/ForgotPassword'));
-const VehicleSearch = React.lazy(() => import('./pages/Vehicle/VehicleSearch'));
-const VehicleDetails = React.lazy(() => import('./pages/Vehicle/VehicleDetails'));
-const BookingPage = React.lazy(() => import('./pages/Booking/BookingPage'));
-const BookingConfirmation = React.lazy(() => import('./pages/Booking/BookingConfirmation'));
-const BookingHistory = React.lazy(() => import('./pages/Booking/BookingHistory'));
-const Profile = React.lazy(() => import('./pages/Profile/Profile'));
-const OwnerDashboard = React.lazy(() => import('./pages/OwnerDashboard/OwnerDashboard'));
-const AddVehicle = React.lazy(() => import('./pages/OwnerDashboard/AddVehicle'));
-const ManageVehicles = React.lazy(() => import('./pages/OwnerDashboard/ManageVehicles'));
-const OwnerBookings = React.lazy(() => import('./pages/OwnerDashboard/OwnerBookings'));
-const NotFound = React.lazy(() => import('./pages/NotFound'));
-const PrivacyPolicy = React.lazy(() => import('./components/Legal/Privacy_Policy'));
-const TermsOfService = React.lazy(() => import('./components/Legal/Terms_Of_Service'));
-const CookiePolicy = React.lazy(() => import('./components/Legal/Cookie_Policy'));
+// Lazy load all pages for optimal performance
+const Home = lazy(() => import('./pages/Home/Home'));
+const HowItWorks = lazy(() => import('./pages/HowItWorks'));
+const About = lazy(() => import('./pages/About'));
+const Contact = lazy(() => import('./pages/Contact'));
+const Search = lazy(() => import('./pages/Search'));
+const Wallet = lazy(() => import('./pages/Wallet'));
+const Support = lazy(() => import('./pages/Support'));
+const Earnings = lazy(() => import('./pages/Earnings'));
+const Login = lazy(() => import('./components/auth/SecureLoginForm'));
+const ProfileCompletion = lazy(() => import('./components/auth/ProfileCompletion'));
+const ForgotPassword = lazy(() => import('./pages/Auth/ForgotPassword'));
+const VehicleSearch = lazy(() => import('./pages/Vehicle/VehicleSearch'));
+const VehicleDetails = lazy(() => import('./pages/Vehicle/VehicleDetails'));
+const BookingPage = lazy(() => import('./pages/Booking/BookingPage'));
+const BookingConfirmation = lazy(() => import('./pages/Booking/BookingConfirmation'));
+const BookingHistory = lazy(() => import('./pages/Booking/BookingHistory'));
+const Profile = lazy(() => import('./pages/Profile/Profile'));
+const OwnerDashboard = lazy(() => import('./pages/OwnerDashboard/OwnerDashboard'));
+const AddVehicle = lazy(() => import('./pages/OwnerDashboard/AddVehicle'));
+const ManageVehicles = lazy(() => import('./pages/OwnerDashboard/ManageVehicles'));
+const OwnerBookings = lazy(() => import('./pages/OwnerDashboard/OwnerBookings'));
+const NotFound = lazy(() => import('./pages/NotFound'));
+const PrivacyPolicy = lazy(() => import('./components/Legal/Privacy_Policy'));
+const TermsOfService = lazy(() => import('./components/Legal/Terms_Of_Service'));
+const CookiePolicy = lazy(() => import('./components/Legal/Cookie_Policy'));
+const OwnerLayout = lazy(() => import('./layouts/OwnerLayout'));
 
 function App() {
   const { loading } = useSecureAuth();
   const location = useLocation();
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner size="large" />
-      </div>
-    );
+    return <PageLoader text="Initializing RentRider" />;
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-
-      <Navigation />
-      
-      <main className="flex-grow">
-        <Suspense fallback={
-          <div className="min-h-screen flex items-center justify-center">
-            <LoadingSpinner size="large" />
-          </div>
-        }>
-          <Routes key={location.pathname}>
-            {/* Public Routes */}
-            <Route path="/" element={<Home />} />
-            <Route path="/how-it-works" element={<HowItWorks />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/profile-completion" element={<ProfileCompletion />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/vehicles" element={<VehicleSearch />} />
-            <Route path="/vehicles/:id" element={<VehicleDetails />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-            <Route path="/terms-of-service" element={<TermsOfService />} />
-            <Route path="/cookie-policy" element={<CookiePolicy />} />
-            
-            {/* Protected Routes - General */}
-            <Route 
-              path="/search" 
-              element={
-                <ProtectedRoute>
-                  <Search />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/wallet" 
-              element={
-                <ProtectedRoute>
-                  <Wallet />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/support" 
-              element={
-                <ProtectedRoute>
-                  <Support />
-                </ProtectedRoute>
-              } 
-            />
-
-            
-            {/* Protected Routes - Customer */}
-            <Route 
-              path="/book/:vehicleId" 
-              element={
-                <ProtectedRoute>
-                  <BookingPage />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/booking/confirmation/:bookingId" 
-              element={
-                <ProtectedRoute>
-                  <BookingConfirmation />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/bookings" 
-              element={
-                <ProtectedRoute>
-                  <BookingHistory />
-                </ProtectedRoute>
-              } 
-            />
-            
-            {/* Protected Routes - Owner */}
-            <Route 
-              path="/owner" 
-              element={
-                <ProtectedRoute allowedRoles={['owner']}>
-                  <OwnerLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<OwnerDashboard />} />
-              <Route path="dashboard" element={<OwnerDashboard />} />
-              <Route path="vehicles" element={<ManageVehicles />} />
-              <Route path="add-vehicle" element={<AddVehicle />} />
-              <Route path="bookings" element={<OwnerBookings />} />
-              <Route path="earnings" element={<Earnings />} />
-            </Route>
-            
-            {/* 404 Route */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </Suspense>
-      </main>
-      
-      <Footer />
-      
-      {/* Toast notifications */}
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          duration: 4000,
-          style: {
-            background: '#363636',
-            color: '#fff',
-          },
-          success: {
-            duration: 3000,
-            style: {
-              background: '#4ade80',
-              color: '#fff',
-            },
-          },
-          error: {
-            duration: 5000,
-            style: {
-              background: '#ef4444',
-              color: '#fff',
-            },
-          },
-          loading: {
-            style: {
-              background: '#3b82f6',
-              color: '#fff',
-            },
-          },
-        }}
-      />
-    </div>
+    <ErrorBoundary>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 flex flex-col">
+        <Navigation />
+        
+        <main className="flex-grow">
+          <Suspense fallback={<PageLoader text="Loading page" />}>
+            <Routes key={location.pathname}>
+              {/* Public Routes */}
+              <Route path="/" element={<Home />} />
+              <Route path="/how-it-works" element={<HowItWorks />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/profile-completion" element={<ProfileCompletion />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/vehicles" element={<VehicleSearch />} />
+              <Route path="/vehicles/:id" element={<VehicleDetails />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+              <Route path="/terms-of-service" element={<TermsOfService />} />
+              <Route path="/cookie-policy" element={<CookiePolicy />} />
+              
+              {/* Protected Routes - General */}
+              <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
+              <Route path="/wallet" element={<ProtectedRoute><Wallet /></ProtectedRoute>} />
+              <Route path="/support" element={<ProtectedRoute><Support /></ProtectedRoute>} />
+              
+              {/* Protected Routes - Customer */}
+              <Route path="/book/:vehicleId" element={<ProtectedRoute><BookingPage /></ProtectedRoute>} />
+              <Route path="/booking/confirmation/:bookingId" element={<ProtectedRoute><BookingConfirmation /></ProtectedRoute>} />
+              <Route path="/bookings" element={<ProtectedRoute><BookingHistory /></ProtectedRoute>} />
+              
+              {/* Protected Routes - Owner */}
+              <Route path="/owner" element={<ProtectedRoute allowedRoles={['owner']}><OwnerLayout /></ProtectedRoute>}>
+                <Route index element={<OwnerDashboard />} />
+                <Route path="dashboard" element={<OwnerDashboard />} />
+                <Route path="vehicles" element={<ManageVehicles />} />
+                <Route path="add-vehicle" element={<AddVehicle />} />
+                <Route path="bookings" element={<OwnerBookings />} />
+                <Route path="earnings" element={<Earnings />} />
+              </Route>
+              
+              {/* 404 Route */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
+        </main>
+        
+        <Footer />
+        
+        <EnhancedToaster />
+      </div>
+    </ErrorBoundary>
   );
 }
 
