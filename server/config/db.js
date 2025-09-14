@@ -2,10 +2,16 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
+    // MongoDB Atlas connection options
+    const options = {
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      maxPoolSize: 10,
+      minPoolSize: 5,
+      maxIdleTimeMS: 30000
+    };
+
+    const conn = await mongoose.connect(process.env.MONGODB_URI, options);
 
     console.log(`MongoDB Connected: ${conn.connection.host}`);
     

@@ -1,13 +1,14 @@
 import React, { Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { useAuth } from './context/AuthContext';
+import { useSecureAuth } from './context/SecureAuthContext';
 
 // Components
 import Navigation from './components/Navigation';
 import Footer from './components/Footer';
 import LoadingSpinner from './components/LoadingSpinner';
-import ProtectedRoute from './components/ProtectedRoute';
+import ProtectedRoute from './components/auth/ProtectedRoute';
+
 
 // Layouts
 import OwnerLayout from './layouts/OwnerLayout';
@@ -21,8 +22,8 @@ const Search = React.lazy(() => import('./pages/Search'));
 const Wallet = React.lazy(() => import('./pages/Wallet'));
 const Support = React.lazy(() => import('./pages/Support'));
 const Earnings = React.lazy(() => import('./pages/Earnings'));
-const Login = React.lazy(() => import('./pages/Auth/Login'));
-const Register = React.lazy(() => import('./pages/Auth/Register'));
+const Login = React.lazy(() => import('./components/auth/SecureLoginForm'));
+const ProfileCompletion = React.lazy(() => import('./components/auth/ProfileCompletion'));
 const ForgotPassword = React.lazy(() => import('./pages/Auth/ForgotPassword'));
 const VehicleSearch = React.lazy(() => import('./pages/Vehicle/VehicleSearch'));
 const VehicleDetails = React.lazy(() => import('./pages/Vehicle/VehicleDetails'));
@@ -35,9 +36,12 @@ const AddVehicle = React.lazy(() => import('./pages/OwnerDashboard/AddVehicle'))
 const ManageVehicles = React.lazy(() => import('./pages/OwnerDashboard/ManageVehicles'));
 const OwnerBookings = React.lazy(() => import('./pages/OwnerDashboard/OwnerBookings'));
 const NotFound = React.lazy(() => import('./pages/NotFound'));
+const PrivacyPolicy = React.lazy(() => import('./components/Legal/Privacy_Policy'));
+const TermsOfService = React.lazy(() => import('./components/Legal/Terms_Of_Service'));
+const CookiePolicy = React.lazy(() => import('./components/Legal/Cookie_Policy'));
 
 function App() {
-  const { loading } = useAuth();
+  const { loading } = useSecureAuth();
 
   if (loading) {
     return (
@@ -64,10 +68,14 @@ function App() {
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
+            <Route path="/profile-completion" element={<ProfileCompletion />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/vehicles" element={<VehicleSearch />} />
             <Route path="/vehicles/:id" element={<VehicleDetails />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms-of-service" element={<TermsOfService />} />
+            <Route path="/cookie-policy" element={<CookiePolicy />} />
             
             {/* Protected Routes - General */}
             <Route 
@@ -94,20 +102,13 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            <Route 
-              path="/profile" 
-              element={
-                <ProtectedRoute>
-                  <Profile />
-                </ProtectedRoute>
-              } 
-            />
+
             
             {/* Protected Routes - Customer */}
             <Route 
               path="/book/:vehicleId" 
               element={
-                <ProtectedRoute allowedRoles={['customer']}>
+                <ProtectedRoute>
                   <BookingPage />
                 </ProtectedRoute>
               } 
@@ -115,7 +116,7 @@ function App() {
             <Route 
               path="/booking/confirmation/:bookingId" 
               element={
-                <ProtectedRoute allowedRoles={['customer']}>
+                <ProtectedRoute>
                   <BookingConfirmation />
                 </ProtectedRoute>
               } 
@@ -123,7 +124,7 @@ function App() {
             <Route 
               path="/bookings" 
               element={
-                <ProtectedRoute allowedRoles={['customer']}>
+                <ProtectedRoute>
                   <BookingHistory />
                 </ProtectedRoute>
               } 

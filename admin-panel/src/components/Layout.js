@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { adminAPI } from '../services/adminAPI';
+import Footer from './Footer';
 
 
 const Layout = ({ children }) => {
@@ -144,10 +145,11 @@ const Layout = ({ children }) => {
         </div>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto">
-          <div className="h-full">
+        <main className="flex-1 overflow-y-auto flex flex-col">
+          <div className="flex-1">
             {children}
           </div>
+          <Footer />
         </main>
       </div>
 

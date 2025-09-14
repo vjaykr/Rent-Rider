@@ -7,7 +7,7 @@ import { HelmetProvider } from 'react-helmet-async';
 import { Toaster } from 'react-hot-toast';
 
 import App from './App';
-import { AuthProvider } from './context/AuthContext';
+import { SecureAuthProvider } from './context/SecureAuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import './index.css';
 
@@ -30,7 +30,7 @@ root.render(
       <HelmetProvider>
         <BrowserRouter>
           <ThemeProvider>
-            <AuthProvider>
+            <SecureAuthProvider>
               <App />
               <Toaster
                 position="top-right"
@@ -52,7 +52,7 @@ root.render(
                   },
                 }}
               />
-            </AuthProvider>
+            </SecureAuthProvider>
           </ThemeProvider>
         </BrowserRouter>
       </HelmetProvider>

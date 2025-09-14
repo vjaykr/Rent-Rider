@@ -16,6 +16,9 @@ const Bookings = React.lazy(() => import('./pages/Bookings/Bookings'));
 const Payments = React.lazy(() => import('./pages/Payments/Payments'));
 const Reports = React.lazy(() => import('./pages/Reports/Reports'));
 const Login = React.lazy(() => import('./pages/Login'));
+const PrivacyPolicy = React.lazy(() => import('./components/Legal/Privacy_Policy'));
+const TermsOfService = React.lazy(() => import('./components/Legal/Terms_Of_Service'));
+const CookiePolicy = React.lazy(() => import('./components/Legal/Cookie_Policy'));
 
 function App() {
   return (
@@ -28,6 +31,9 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/login" element={<Login />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/terms-of-service" element={<TermsOfService />} />
+          <Route path="/cookie-policy" element={<CookiePolicy />} />
           
           {/* Protected Admin Routes with Layout */}
           <Route 

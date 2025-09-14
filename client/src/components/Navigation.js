@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useSecureAuth } from '../context/SecureAuthContext';
 import BookingNotifications from './Notifications/BookingNotifications';
 
 
@@ -8,7 +8,7 @@ const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const { user, logout } = useAuth();
+  const { user, logout } = useSecureAuth();
   const navigate = useNavigate();
   const location = useLocation();
 

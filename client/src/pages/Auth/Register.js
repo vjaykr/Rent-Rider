@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { useAuth } from '../../context/AuthContext';
+import { useSecureAuth } from '../../context/SecureAuthContext';
 import { authAPI } from '../../services/authService';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import OTPVerification from '../../components/OTPVerification';
 import FirebaseAuthButtons from '../../components/FirebaseAuthButtons';
 
 const Register = () => {
-  const { register, isAuthenticated, loading } = useAuth();
+  const { signInWithGoogle, isAuthenticated, loading } = useSecureAuth();
   const navigate = useNavigate();
   
   const [step, setStep] = useState(1); // 1: Form, 2: OTP Verification
@@ -805,12 +805,13 @@ const Register = () => {
 
             {/* Firebase Authentication Options */}
             <FirebaseAuthButtons 
+              mode="signup"
               onSuccess={(user) => {
-                toast.success(`Welcome to RentRider, ${user.displayName || user.email}!`);
-                navigate('/');
+                // Navigation is handled by AuthContext after successful signup
+                console.log('Google signup successful:', user);
               }}
               onError={(error) => {
-                toast.error(`Registration failed: ${error}`);
+                console.error('Registration error:', error);
               }}
             />
 

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useSecureAuth } from '../context/SecureAuthContext';
 
 const Wallet = () => {
-  const { user } = useAuth();
+  const { user } = useSecureAuth();
   const [activeTab, setActiveTab] = useState('balance');
 
   // Mock wallet data

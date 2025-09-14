@@ -199,18 +199,27 @@ const vehicleSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Indexes for better performance
+// MongoDB Atlas optimized indexes
 vehicleSchema.index({ owner: 1 });
 vehicleSchema.index({ type: 1 });
 vehicleSchema.index({ 'location.city': 1 });
-vehicleSchema.index({ 'location.coordinates': '2dsphere' });
+vehicleSchema.index({ 'location.state': 1 });
+vehicleSchema.index({ 'location.coordinates': '2dsphere' }); // Geospatial index for location-based queries
 vehicleSchema.index({ 'pricing.hourlyRate': 1 });
+vehicleSchema.index({ 'pricing.dailyRate': 1 });
 vehicleSchema.index({ 'availability.isAvailable': 1 });
 vehicleSchema.index({ 'verification.isVerified': 1 });
 vehicleSchema.index({ isActive: 1 });
+vehicleSchema.index({ createdAt: -1 });
+vehicleSchema.index({ 'rating.average': -1 });
+vehicleSchema.index({ registrationNumber: 1 }, { unique: true });
 
-// Compound indexes
+// Compound indexes for common queries
 vehicleSchema.index({ type: 1, 'location.city': 1, 'availability.isAvailable': 1 });
+vehicleSchema.index({ 'location.city': 1, isActive: 1, 'verification.isVerified': 1 });
+vehicleSchema.index({ owner: 1, isActive: 1 });
+vehicleSchema.index({ type: 1, 'pricing.hourlyRate': 1 });
+vehicleSchema.index({ 'location.city': 1, 'rating.average': -1 });
 
 // Virtual for primary image
 vehicleSchema.virtual('primaryImage').get(function() {

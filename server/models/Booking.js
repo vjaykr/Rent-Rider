@@ -18,8 +18,7 @@ const bookingSchema = new mongoose.Schema({
   },
   bookingId: {
     type: String,
-    unique: true,
-    required: true
+    unique: true
   },
   duration: {
     startDate: {
@@ -223,20 +222,28 @@ const bookingSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Indexes for better performance
+// MongoDB Atlas optimized indexes
 bookingSchema.index({ customer: 1 });
 bookingSchema.index({ vehicle: 1 });
 bookingSchema.index({ owner: 1 });
-bookingSchema.index({ bookingId: 1 });
+bookingSchema.index({ bookingId: 1 }, { unique: true });
 bookingSchema.index({ status: 1 });
 bookingSchema.index({ 'duration.startDate': 1 });
 bookingSchema.index({ 'duration.endDate': 1 });
 bookingSchema.index({ createdAt: -1 });
+bookingSchema.index({ updatedAt: -1 });
+bookingSchema.index({ 'payment.paymentId': 1 });
+bookingSchema.index({ 'payment.transactionId': 1 });
 
-// Compound indexes
+// Compound indexes for common queries
 bookingSchema.index({ customer: 1, status: 1 });
 bookingSchema.index({ owner: 1, status: 1 });
 bookingSchema.index({ vehicle: 1, 'duration.startDate': 1, 'duration.endDate': 1 });
+bookingSchema.index({ status: 1, createdAt: -1 });
+bookingSchema.index({ customer: 1, createdAt: -1 });
+bookingSchema.index({ owner: 1, createdAt: -1 });
+bookingSchema.index({ 'duration.startDate': 1, status: 1 });
+bookingSchema.index({ vehicle: 1, status: 1 });
 
 // Generate unique booking ID before saving
 bookingSchema.pre('save', async function(next) {

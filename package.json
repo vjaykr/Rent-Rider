@@ -5,12 +5,18 @@
   "main": "index.js",
   "scripts": {
     "dev": "concurrently \"npm run server:dev\" \"npm run client:dev\" \"npm run admin:dev\"",
-    "server:dev": "cd server && PORT=5001 npm run dev",
-    "client:dev": "cd client && npm start",
-    "admin:dev": "cd admin-panel && npm start",
+    "server:dev": "cd server && set HOST=0.0.0.0&& set PORT=5001&& npm run dev",
+    "client:dev": "cd client && set HOST=0.0.0.0&& npm start",
+    "admin:dev": "cd admin-panel && set HOST=0.0.0.0&& npm start",
     "install:all": "npm install && cd client && npm install && cd ../admin-panel && npm install && cd ../server && npm install",
     "build": "cd client && npm run build && cd ../admin-panel && npm run build",
-    "start": "cd server && npm start"
+    "start": "cd server && npm start",
+    "seed:atlas": "cd server && node scripts/atlasSeeder.js",
+    "setup:env": "echo 'Please update .env files with your MongoDB Atlas and Firebase credentials'",
+    "test:connection": "cd server && node -e \"require('dotenv').config(); const mongoose = require('mongoose'); mongoose.connect(process.env.MONGODB_URI).then(() => console.log('✅ Atlas connection successful')).catch(err => console.error('❌ Atlas connection failed:', err));\"",
+    "test:auth": "cd server && curl http://localhost:5001/api/auth/health",
+    "setup:firebase": "echo 'Follow FIREBASE_MONGODB_SETUP.md for complete setup instructions'",
+    "setup:complete": "npm run install:all && npm run setup:env && npm run setup:firebase"
   },
   "keywords": [
     "bike-rental",

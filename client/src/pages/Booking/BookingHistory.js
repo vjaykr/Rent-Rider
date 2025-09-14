@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
+import { useSecureAuth } from '../../context/SecureAuthContext';
 
 const BookingHistory = () => {
-  const { user } = useAuth();
+  const { user } = useSecureAuth();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
 

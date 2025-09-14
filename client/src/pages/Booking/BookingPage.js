@@ -24,7 +24,7 @@ const BookingPage = () => {
     e.preventDefault();
     // Handle booking submission
     console.log('Booking data:', bookingData);
-    navigate('/booking-confirmation');
+    navigate('/booking/confirmation/BK12345');
   };
 
   return (

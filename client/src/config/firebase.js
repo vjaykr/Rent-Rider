@@ -1,57 +1,38 @@
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, FacebookAuthProvider } from "firebase/auth";
-import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
+import { initializeApp } from 'firebase/app';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from 'firebase/auth';
+import { getStorage } from 'firebase/storage';
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyAG4DKY0s8gPdbe8VEYkNcql-TvZIm2-qA",
-  authDomain: "rentrider-26626.firebaseapp.com",
-  projectId: "rentrider-26626",
-  storageBucket: "rentrider-26626.firebasestorage.app",
-  messagingSenderId: "963227422013",
-  appId: "1:963227422013:web:ba21e86a225f44450f8954",
-  measurementId: "G-GF7QQZSYPP"
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.REACT_APP_FIREBASE_APP_ID,
+  measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firebase services
-const auth = getAuth(app);
-const db = getFirestore(app);
+// Initialize Firebase Authentication and get a reference to the service
+export const auth = getAuth(app);
 
-// Configure Firestore to work better in offline mode
-if (process.env.NODE_ENV === 'development') {
-  // Enable offline persistence for development
-  try {
-    // Note: This is commented out as it can cause issues in development
-    // enableNetwork(db);
-  } catch (error) {
-    console.warn('Firestore offline persistence setup failed:', error);
-  }
-}
+// Initialize Firebase Storage
+export const storage = getStorage(app);
 
-// Configure auth providers
-const googleProvider = new GoogleAuthProvider();
-const facebookProvider = new FacebookAuthProvider();
-
-// Configure Google provider
+// Google Auth Provider
+export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
-  prompt: 'select_account',
+  prompt: 'select_account'
 });
 
-// Configure Facebook provider
-facebookProvider.setCustomParameters({
-  display: 'popup',
-});
-
-export {
-  auth,
-  db,
-  googleProvider,
-  facebookProvider
-};
+// Auth methods
+export const signInWithGoogle = () => signInWithPopup(auth, googleProvider);
+export const signInWithEmail = (email, password) => signInWithEmailAndPassword(auth, email, password);
+export const createUserWithEmail = (email, password) => createUserWithEmailAndPassword(auth, email, password);
+export const signOutUser = () => signOut(auth);
+export const onAuthStateChange = (callback) => onAuthStateChanged(auth, callback);
+export const resetPassword = (email) => sendPasswordResetEmail(auth, email);
 
 export default app;

@@ -1,60 +1,111 @@
-import api from './api';
+import axios from 'axios';
 
-// Demo mode configuration
-const DEMO_MODE = process.env.REACT_APP_DEMO_MODE === 'true' || process.env.NODE_ENV === 'development';
-const DEMO_OTP = process.env.REACT_APP_DEMO_OTP || '123456';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
-export const authAPI = {
-  // Send OTP for registration
-  sendRegistrationOTP: async (phoneNumber) => {
+// Create axios instance with default config
+const api = axios.create({
+  baseURL: API_URL,
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
+
+// Request interceptor to add auth token
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Response interceptor to handle auth errors
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
+export const authService = {
+  // Firebase authentication
+  async firebaseAuth(idToken, userData = null) {
     try {
-      // Make API call to backend
-      const response = await api.post('/auth/send-otp', { phone: phoneNumber });
-      
-      // Return the response as is - backend already handles demo mode
-      return response;
+      const response = await api.post('/auth/firebase-auth', {
+        idToken,
+        userData
+      });
+      return response.data;
     } catch (error) {
-      console.error('Send OTP error:', error);
       throw error;
     }
   },
-  
-  // Verify OTP
-  verifyOTP: async (phoneNumber, otp) => {
+
+  // Email/password registration
+  async register(userData) {
     try {
-      // Make API call to backend for verification - backend handles demo mode
-      const response = await api.post('/auth/verify-otp', { phone: phoneNumber, otp });
-      return response;
+      const response = await api.post('/auth/register', userData);
+      return response.data;
     } catch (error) {
-      console.error('Verify OTP error:', error);
       throw error;
     }
   },
-  
-  // Register new user
-  register: (userData) => api.post('/auth/register', userData),
-  
-  // Login user
-  login: (credentials) => api.post('/auth/login', credentials),
-  
+
+  // Email/password login
+  async login(email, password) {
+    try {
+      const response = await api.post('/auth/login', { email, password });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
   // Get user profile
-  getProfile: () => api.get('/auth/profile'),
-  
+  async getProfile() {
+    try {
+      const response = await api.get('/auth/profile');
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
   // Update user profile
-  updateProfile: (userData) => api.put('/auth/profile', userData),
-  
-  // Change password
-  changePassword: (passwordData) => api.put('/auth/change-password', passwordData),
-  
-  // Forgot password
-  forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
-  
-  // Reset password
-  resetPassword: (token, newPassword) => api.post(`/auth/reset-password/${token}`, { newPassword }),
-  
-  // Verify email
-  verifyEmail: (token) => api.post(`/auth/verify-email/${token}`),
-  
+  async updateProfile(userData) {
+    try {
+      const response = await api.put('/auth/profile', userData);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
   // Logout
-  logout: () => api.post('/auth/logout'),
+  async logout() {
+    try {
+      const response = await api.post('/auth/logout');
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // Check auth health
+  async checkHealth() {
+    try {
+      const response = await api.get('/auth/health');
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
 };

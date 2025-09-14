@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { useAuth } from '../../context/AuthContext';
+import { useSecureAuth } from '../../context/SecureAuthContext';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import FirebaseAuthButtons from '../../components/FirebaseAuthButtons';
+import GoogleAuthDebug from '../../components/GoogleAuthDebug';
 
 const Login = () => {
-  const { login, isAuthenticated, loading } = useAuth();
+  const { signInWithEmail, isAuthenticated, loading } = useSecureAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -256,13 +257,13 @@ const Login = () => {
             {/* Firebase Authentication Options */}
             <div className="mt-6">
               <FirebaseAuthButtons 
+                mode="login"
                 onSuccess={(user) => {
-                  toast.success(`Welcome back, ${user.displayName || user.email}!`);
-                  const from = location.state?.from || '/';
-                  navigate(from, { replace: true });
+                  // Navigation is handled by AuthContext after successful login
+                  console.log('Google login successful:', user);
                 }}
                 onError={(error) => {
-                  toast.error(`Login failed: ${error}`);
+                  console.error('Login error:', error);
                 }}
               />
             </div>
@@ -282,6 +283,13 @@ const Login = () => {
           </div>
         </form>
       </div>
+      
+      {/* Debug Component - Remove in production */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="max-w-md w-full mx-auto mt-8">
+          <GoogleAuthDebug />
+        </div>
+      )}
     </div>
   );
 };

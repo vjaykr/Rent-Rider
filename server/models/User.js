@@ -2,6 +2,19 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
+  email: {
+    type: String,
+    required: [true, 'Email is required'],
+    unique: true,
+    lowercase: true,
+    index: true,
+    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
+  },
+  fullName: {
+    type: String,
+    required: [true, 'Full name is required'],
+    trim: true
+  },
   firstName: {
     type: String,
     required: [true, 'First name is required'],
@@ -14,22 +27,44 @@ const userSchema = new mongoose.Schema({
     trim: true,
     maxlength: [50, 'Last name cannot exceed 50 characters']
   },
-  email: {
+  photoURL: {
     type: String,
-    required: [true, 'Email is required'],
-    unique: true,
-    lowercase: true,
-    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
+    default: null
   },
   phone: {
     type: String,
-    required: [true, 'Phone number is required'],
+    default: null,
     match: [/^[6-9]\d{9}$/, 'Please enter a valid Indian phone number']
+  },
+  bio: {
+    type: String,
+    default: null,
+    maxlength: [500, 'Bio cannot exceed 500 characters']
+  },
+  dateOfBirth: {
+    type: Date,
+    default: null
+  },
+  isProfileComplete: {
+    type: Boolean,
+    default: false
+  },
+  firebaseUid: {
+    type: String,
+    required: [true, 'Firebase UID is required'],
+    unique: true,
+    index: true
+  },
+  hasPassword: {
+    type: Boolean,
+    default: false
   },
   password: {
     type: String,
-    required: [true, 'Password is required'],
-    minlength: [6, 'Password must be at least 6 characters long'],
+    required: function() {
+      return this.authProvider === 'email' && this.hasPassword;
+    },
+    minlength: [8, 'Password must be at least 8 characters long'],
     select: false
   },
   role: {
@@ -37,13 +72,10 @@ const userSchema = new mongoose.Schema({
     enum: ['customer', 'owner', 'admin'],
     default: 'customer'
   },
-  avatar: {
+  authProvider: {
     type: String,
-    default: null
-  },
-  dateOfBirth: {
-    type: Date,
-    required: [true, 'Date of birth is required']
+    enum: ['email', 'google', 'phone'],
+    default: 'google'
   },
   address: {
     street: String,
@@ -78,6 +110,16 @@ const userSchema = new mongoose.Schema({
   lastLogin: {
     type: Date,
     default: null
+  },
+
+  preferences: {
+    notifications: {
+      email: { type: Boolean, default: true },
+      sms: { type: Boolean, default: true },
+      push: { type: Boolean, default: true }
+    },
+    currency: { type: String, default: 'INR' },
+    language: { type: String, default: 'en' }
   },
   // For owners
   ownerDetails: {
@@ -174,18 +216,31 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for better performance
-userSchema.index({ email: 1 });
-userSchema.index({ phone: 1 });
+// MongoDB Atlas optimized indexes
+userSchema.index({ email: 1 }, { unique: true });
+userSchema.index({ phone: 1 }, { unique: true, sparse: true });
+userSchema.index({ firebaseUid: 1 }, { unique: true, sparse: true });
 userSchema.index({ role: 1 });
+userSchema.index({ isActive: 1 });
+userSchema.index({ createdAt: -1 });
+userSchema.index({ 'ownerDetails.isVerified': 1 });
+userSchema.index({ email: 1, role: 1 });
+userSchema.index({ role: 1, isActive: 1 });
 
-// Hash password before saving
+// Pre-save middleware for fullName and password
 userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
-  
   try {
-    const salt = await bcrypt.genSalt(12);
-    this.password = await bcrypt.hash(this.password, salt);
+    // Update fullName when firstName or lastName changes
+    if (this.isModified('firstName') || this.isModified('lastName')) {
+      this.fullName = `${this.firstName} ${this.lastName}`;
+    }
+    
+    // Hash password if modified
+    if (this.isModified('password') && this.password) {
+      const salt = await bcrypt.genSalt(12);
+      this.password = await bcrypt.hash(this.password, salt);
+    }
+    
     next();
   } catch (error) {
     next(error);
@@ -194,13 +249,9 @@ userSchema.pre('save', async function(next) {
 
 // Compare password method
 userSchema.methods.comparePassword = async function(candidatePassword) {
+  if (!this.password) return false;
   return await bcrypt.compare(candidatePassword, this.password);
 };
-
-// Get full name
-userSchema.virtual('fullName').get(function() {
-  return `${this.firstName} ${this.lastName}`;
-});
 
 // Transform JSON output
 userSchema.methods.toJSON = function() {

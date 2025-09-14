@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useSecureAuth } from '../context/SecureAuthContext';
 import { FaGoogle, FaFacebook, FaPhone } from 'react-icons/fa';
 import { AiOutlineLoading3Quarters } from 'react-icons/ai';
 import toast from 'react-hot-toast';
 
-const FirebaseAuthButtons = ({ onSuccess, onError }) => {
-  const { googleLogin, facebookLogin, sendPhoneVerification, verifyPhoneCode } = useAuth();
+const FirebaseAuthButtons = ({ onSuccess, onError, mode = 'login' }) => {
+  const { signInWithGoogle } = useSecureAuth();
   const [loading, setLoading] = useState({
     google: false,
     facebook: false,
@@ -16,14 +16,25 @@ const FirebaseAuthButtons = ({ onSuccess, onError }) => {
   const [verificationCode, setVerificationCode] = useState('');
   const [confirmationResult, setConfirmationResult] = useState(null);
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleAuth = async () => {
     setLoading(prev => ({ ...prev, google: true }));
     try {
-      const result = await googleLogin();
+      const result = mode === 'signup' ? await googleSignup() : await googleLogin();
       if (result.success) {
         onSuccess && onSuccess(result.user);
       } else {
-        onError && onError(result.error);
+        // Handle specific error cases
+        if (result.needsSignup && mode === 'login') {
+          toast.error('Account not found. Please sign up first.');
+          // Redirect to register page
+          window.location.href = '/register';
+        } else if (result.needsLogin && mode === 'signup') {
+          toast.error('Account already exists. Please login instead.');
+          // Redirect to login page
+          window.location.href = '/login';
+        } else {
+          onError && onError(result.error);
+        }
       }
     } catch (error) {
       onError && onError(error.message);
@@ -95,7 +106,7 @@ const FirebaseAuthButtons = ({ onSuccess, onError }) => {
     <div className="space-y-3">
       {/* Google Login */}
       <button
-        onClick={handleGoogleLogin}
+        onClick={handleGoogleAuth}
         disabled={loading.google}
         className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
       >
@@ -104,7 +115,7 @@ const FirebaseAuthButtons = ({ onSuccess, onError }) => {
         ) : (
           <FaGoogle className="h-5 w-5 mr-2 text-red-500" />
         )}
-        Continue with Google
+        {mode === 'signup' ? 'Sign up' : 'Continue'} with Google
       </button>
 
       {/* Facebook Login */}

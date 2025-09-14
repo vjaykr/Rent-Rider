@@ -1,24 +1,45 @@
 const admin = require('firebase-admin');
 
-// Initialize Firebase Admin SDK
+// Initialize Firebase Admin SDK with new API
 const initializeFirebase = () => {
   try {
     if (!admin.apps.length) {
-      admin.initializeApp({
-        credential: admin.credential.cert({
-          projectId: process.env.FIREBASE_PROJECT_ID || 'rentrider-26626',
-          // For production, use service account key file
-          // For development, we'll use Application Default Credentials
-        }),
-        storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'rentrider-26626.firebasestorage.app'
-      });
+      // For development, use minimal config without service account
+      if (process.env.NODE_ENV === 'development') {
+        admin.initializeApp({
+          projectId: process.env.FIREBASE_PROJECT_ID,
+          storageBucket: process.env.FIREBASE_STORAGE_BUCKET
+        });
+      } else {
+        // Production: Use service account credentials
+        if (process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
+          const serviceAccount = {
+            type: "service_account",
+            project_id: process.env.FIREBASE_PROJECT_ID,
+            private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+            client_email: process.env.FIREBASE_CLIENT_EMAIL
+          };
+
+          admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount),
+            storageBucket: process.env.FIREBASE_STORAGE_BUCKET
+          });
+        } else {
+          throw new Error('Firebase service account credentials not found');
+        }
+      }
     }
     
     console.log('Firebase Admin initialized successfully');
     return admin;
   } catch (error) {
     console.error('Firebase initialization error:', error);
-    return null;
+    // Don't fail the server startup for Firebase issues in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Continuing without Firebase Admin SDK...');
+      return null;
+    }
+    throw error;
   }
 };
 

@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useSecureAuth } from '../../context/SecureAuthContext';
 import { toast } from 'react-hot-toast';
 import { ownerService } from '../../services/ownerService';
 
 const OwnerDashboard = () => {
-  const { user } = useAuth();
+  const { user } = useSecureAuth();
   const [stats, setStats] = useState({
     totalVehicles: 0,
     activeBookings: 0,

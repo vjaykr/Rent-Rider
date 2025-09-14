@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useSecureAuth } from '../context/SecureAuthContext';
 
 const Earnings = () => {
-  const { user } = useAuth();
+  const { user } = useSecureAuth();
   const [selectedPeriod, setSelectedPeriod] = useState('month');
 
   // Mock earnings data

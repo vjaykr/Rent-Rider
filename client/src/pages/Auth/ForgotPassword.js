@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useSecureAuth } from '../../context/SecureAuthContext';
+import { resetPassword } from '../../config/firebase';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
 
 const ForgotPassword = () => {
-  const { firebaseResetPassword } = useAuth();
+  const { } = useSecureAuth();
   const navigate = useNavigate();
   
   const [email, setEmail] = useState('');
@@ -35,16 +36,18 @@ const ForgotPassword = () => {
     setErrors({});
     
     try {
-      const result = await firebaseResetPassword(email);
-      
-      if (result.success) {
-        setEmailSent(true);
-        toast.success('Password reset email sent successfully!');
-      } else {
-        toast.error(result.error || 'Failed to send reset email');
-      }
+      await resetPassword(email);
+      setEmailSent(true);
+      toast.success('Password reset email sent successfully!');
     } catch (error) {
-      toast.error('Failed to send reset email');
+      console.error('Password reset error:', error);
+      if (error.code === 'auth/user-not-found') {
+        toast.error('No account found with this email address');
+      } else if (error.code === 'auth/invalid-email') {
+        toast.error('Invalid email address');
+      } else {
+        toast.error('Failed to send reset email. Please try again.');
+      }
     } finally {
       setIsSubmitting(false);
     }
