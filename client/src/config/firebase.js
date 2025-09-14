@@ -23,9 +23,6 @@ export const storage = getStorage(app);
 
 // Google Auth Provider
 export const googleProvider = new GoogleAuthProvider();
-googleProvider.setCustomParameters({
-  prompt: 'select_account'
-});
 
 // Auth methods
 export const signInWithGoogle = () => signInWithPopup(auth, googleProvider);

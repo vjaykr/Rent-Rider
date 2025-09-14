@@ -117,16 +117,30 @@ export const SecureAuthProvider = ({ children }) => {
     };
 
     initializeAuth();
+    
+    // Auto-refresh user data every 5 minutes
+    const interval = setInterval(initializeAuth, 5 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
-  // Listen for logout events
+  // Listen for logout and auth update events
   useEffect(() => {
     const handleLogout = () => {
       dispatch({ type: AUTH_ACTIONS.LOGOUT });
     };
 
+    const handleAuthUpdate = (event) => {
+      if (event.detail) {
+        dispatch({ type: AUTH_ACTIONS.LOGIN_SUCCESS, payload: { user: event.detail } });
+      }
+    };
+
     window.addEventListener('auth:logout', handleLogout);
-    return () => window.removeEventListener('auth:logout', handleLogout);
+    window.addEventListener('auth:update', handleAuthUpdate);
+    return () => {
+      window.removeEventListener('auth:logout', handleLogout);
+      window.removeEventListener('auth:update', handleAuthUpdate);
+    };
   }, []);
 
   // Firebase auth state listener (for Google auth)
@@ -166,7 +180,16 @@ export const SecureAuthProvider = ({ children }) => {
         return { success: false, message: response.message };
       }
     } catch (error) {
-      const message = error.message || 'Google authentication failed';
+      let message = 'Google authentication failed';
+      
+      if (error.message && error.message.includes('Network Error')) {
+        message = 'Network connection failed. Please check your internet connection.';
+      } else if (error.message && error.message.includes('Invalid authentication token')) {
+        message = 'Authentication token expired. Please try signing in again.';
+      } else if (error.message) {
+        message = error.message;
+      }
+      
       dispatch({ type: AUTH_ACTIONS.SET_ERROR, payload: message });
       return { success: false, message };
     }
@@ -230,7 +253,10 @@ export const SecureAuthProvider = ({ children }) => {
       const response = await secureAuthService.updateProfile(profileData);
       
       if (response.success) {
-        dispatch({ type: AUTH_ACTIONS.UPDATE_USER, payload: response.user });
+        // Force immediate state update
+        dispatch({ type: AUTH_ACTIONS.LOGIN_SUCCESS, payload: { user: response.user } });
+        // Emit event with user data to update navbar immediately
+        window.dispatchEvent(new CustomEvent('profile:updated', { detail: { user: response.user } }));
         return response;
       } else {
         dispatch({ type: AUTH_ACTIONS.SET_ERROR, payload: response.message });
@@ -266,6 +292,20 @@ export const SecureAuthProvider = ({ children }) => {
     dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
   };
 
+  // Refresh user data
+  const refreshUser = async () => {
+    try {
+      const response = await secureAuthService.getCurrentUser();
+      if (response.success) {
+        dispatch({ type: AUTH_ACTIONS.LOGIN_SUCCESS, payload: { user: response.user } });
+        // Force component re-render
+        window.dispatchEvent(new CustomEvent('user:refreshed'));
+      }
+    } catch (error) {
+      console.error('Failed to refresh user data:', error);
+    }
+  };
+
   const value = {
     ...state,
     signInWithGoogle,
@@ -273,7 +313,8 @@ export const SecureAuthProvider = ({ children }) => {
     signInWithEmail,
     updateProfile,
     logout,
-    clearError
+    clearError,
+    refreshUser
   };
 
   return (

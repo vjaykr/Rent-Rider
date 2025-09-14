@@ -25,13 +25,4 @@ router.get('/me', authenticateUser, getCurrentUser);
 router.put('/profile', authenticateUser, updateProfile);
 router.post('/logout', authenticateUser, logout);
 
-// Health check
-router.get('/health', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Secure auth system is healthy',
-    timestamp: new Date().toISOString()
-  });
-});
-
 module.exports = router;

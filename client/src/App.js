@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useSecureAuth } from './context/SecureAuthContext';
 
@@ -8,6 +8,7 @@ import Navigation from './components/Navigation';
 import Footer from './components/Footer';
 import LoadingSpinner from './components/LoadingSpinner';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+
 
 
 // Layouts
@@ -42,6 +43,7 @@ const CookiePolicy = React.lazy(() => import('./components/Legal/Cookie_Policy')
 
 function App() {
   const { loading } = useSecureAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -53,6 +55,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
+
       <Navigation />
       
       <main className="flex-grow">
@@ -61,7 +64,7 @@ function App() {
             <LoadingSpinner size="large" />
           </div>
         }>
-          <Routes>
+          <Routes key={location.pathname}>
             {/* Public Routes */}
             <Route path="/" element={<Home />} />
             <Route path="/how-it-works" element={<HowItWorks />} />

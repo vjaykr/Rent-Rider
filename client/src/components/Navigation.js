@@ -8,9 +8,43 @@ const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const { user, logout } = useSecureAuth();
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [forceUpdate, setForceUpdate] = useState(0);
+  const { user, logout, refreshUser } = useSecureAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Refresh user data when returning from profile page
+  useEffect(() => {
+    if (location.pathname === '/' && user) {
+      refreshUser();
+    }
+  }, [location.pathname, refreshUser, user]);
+
+  // Listen for profile update events and force re-render
+  useEffect(() => {
+    const handleProfileUpdate = (event) => {
+      if (event.detail?.user) {
+        // Direct state update without API call
+        window.dispatchEvent(new CustomEvent('auth:update', { detail: event.detail.user }));
+      } else {
+        refreshUser();
+      }
+      // Force component re-render
+      setForceUpdate(prev => prev + 1);
+    };
+
+    const handleUserUpdate = () => {
+      setForceUpdate(prev => prev + 1);
+    };
+
+    window.addEventListener('profile:updated', handleProfileUpdate);
+    window.addEventListener('user:updated', handleUserUpdate);
+    return () => {
+      window.removeEventListener('profile:updated', handleProfileUpdate);
+      window.removeEventListener('user:updated', handleUserUpdate);
+    };
+  }, [refreshUser]);
 
   const handleLogout = () => {
     logout();
@@ -49,7 +83,6 @@ const Navigation = () => {
     { name: 'My Bookings', path: '/bookings', icon: BookingIcon },
     { name: 'Wallet', path: '/wallet', icon: WalletIcon },
     { name: 'Support', path: '/support', icon: SupportIcon },
-    { name: 'Profile', path: '/profile', icon: ProfileIcon },
   ];
 
   // Owner navigation items (after login)
@@ -59,7 +92,6 @@ const Navigation = () => {
     { name: 'Bookings', path: '/owner/bookings', icon: BookingIcon },
     { name: 'Earnings', path: '/owner/earnings', icon: EarningsIcon },
     { name: 'Support', path: '/support', icon: SupportIcon },
-    { name: 'Profile', path: '/profile', icon: ProfileIcon },
   ];
 
   const getNavigationItems = () => {
@@ -73,7 +105,7 @@ const Navigation = () => {
   };
 
   return (
-    <nav className="sticky top-0 z-50 backdrop-blur-md bg-white/10 border-b border-white/20 shadow-[0_4px_20px_rgba(0,0,0,0.25)]">
+    <nav key={`${user?.firstName}-${user?.lastName}-${user?.id}-${forceUpdate}`} className="sticky top-0 z-50 backdrop-blur-md bg-white/10 border-b border-white/20 shadow-[0_4px_20px_rgba(0,0,0,0.25)]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           {/* Logo */}
@@ -97,15 +129,15 @@ const Navigation = () => {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search vehicles by location, type, or brand..."
+                    placeholder="Search vehicles "
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                   <SearchIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
                   <button
                     type="submit"
-                    className="absolute right-2 top-1.5 px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                    className="absolute right-2 top-1.5 p-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                   >
-                    Search
+                    <SearchIcon className="h-4 w-4" />
                   </button>
                 </div>
               </form>
@@ -137,20 +169,17 @@ const Navigation = () => {
               <div className="flex items-center space-x-4">
                 <Link
                   to="/login"
-                  className="text-gray-700 hover:text-blue-600 font-medium"
+                  className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
                 >
                   Login
                 </Link>
-                <Link
-                  to="/register"
-                  className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  Sign Up
-                </Link>
               </div>
             ) : (
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2">
+              <div className="relative">
+                <button
+                  onClick={() => setShowDropdown(!showDropdown)}
+                  className="flex items-center space-x-2 hover:bg-gray-50 rounded-lg p-2 transition-colors"
+                >
                   <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
                     <span className="text-white text-sm font-medium">
                       {user.firstName?.charAt(0)?.toUpperCase() || 'U'}
@@ -159,13 +188,24 @@ const Navigation = () => {
                   <span className="text-sm font-medium text-gray-700">
                     {user.firstName} {user.lastName}
                   </span>
-                </div>
-                <button
-                  onClick={handleLogout}
-                  className="text-gray-700 hover:text-red-600 font-medium"
-                >
-                  Logout
                 </button>
+                {showDropdown && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-50">
+                    <Link
+                      to="/profile"
+                      onClick={() => setShowDropdown(false)}
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-t-md"
+                    >
+                      Profile
+                    </Link>
+                    <button
+                      onClick={() => { handleLogout(); setShowDropdown(false); }}
+                      className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-b-md"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -208,10 +248,10 @@ const Navigation = () => {
                 <SearchIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
                 <button
                   type="submit"
-                  className="absolute right-2 top-1.5 px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                  className="absolute right-2 top-1.5 p-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                 >
-                  Search
-                </button>
+                  <SearchIcon className="h-4 w-4" />
+                </button>n>
               </div>
             </form>
           </div>
@@ -247,16 +287,9 @@ const Navigation = () => {
                 <Link
                   to="/login"
                   onClick={closeMobileMenu}
-                  className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 rounded-md"
+                  className="block px-3 py-2 text-base font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md"
                 >
                   Login
-                </Link>
-                <Link
-                  to="/register"
-                  onClick={closeMobileMenu}
-                  className="block px-3 py-2 text-base font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md mt-2"
-                >
-                  Sign Up
                 </Link>
               </div>
             ) : (
@@ -274,6 +307,13 @@ const Navigation = () => {
                     <p className="text-xs text-gray-500 capitalize">{user.role}</p>
                   </div>
                 </div>
+                <Link
+                  to="/profile"
+                  onClick={closeMobileMenu}
+                  className="block px-3 py-2 text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 rounded-md"
+                >
+                  Profile
+                </Link>
                 <button
                   onClick={handleLogout}
                   className="block w-full text-left px-3 py-2 text-base font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md"

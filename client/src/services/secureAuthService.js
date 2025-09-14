@@ -1,10 +1,19 @@
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+// Dynamic API URL for network access
+const getApiUrl = () => {
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
+  
+  // Use current host for network access
+  const currentHost = window.location.hostname;
+  return `http://${currentHost}:5001/api`;
+};
 
 // Create axios instance with secure defaults
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: getApiUrl(),
   timeout: 10000,
   withCredentials: true, // Include HTTP-only cookies
   headers: {

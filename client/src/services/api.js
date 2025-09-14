@@ -1,10 +1,18 @@
 import axios from 'axios';
 
-// Create axios instance
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+// Create axios instance with dynamic host detection
+const getApiBaseUrl = () => {
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
+  
+  // Use current host for network access
+  const currentHost = window.location.hostname;
+  return `http://${currentHost}:5001/api`;
+};
 
 const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: getApiBaseUrl(),
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',

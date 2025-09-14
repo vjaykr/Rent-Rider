@@ -1,4 +1,15 @@
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+// Dynamic API base URL for network access
+const getApiBaseUrl = () => {
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
+  
+  // Use current host for network access
+  const currentHost = window.location.hostname;
+  return `http://${currentHost}:5001/api`;
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 const apiCall = async (endpoint, options = {}) => {
   try {

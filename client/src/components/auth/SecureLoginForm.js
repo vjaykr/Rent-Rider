@@ -56,11 +56,9 @@ const SecureLoginForm = () => {
       setIsSubmitting(true);
       clearError();
 
+      const { signInWithPopup, GoogleAuthProvider } = await import('firebase/auth');
       const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({
-        prompt: 'select_account'
-      });
-
+      
       const result = await signInWithPopup(auth, provider);
       const idToken = await result.user.getIdToken();
 
