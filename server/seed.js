@@ -4,8 +4,11 @@ const User = require('./models/User');
 const Vehicle = require('./models/Vehicle');
 const Booking = require('./models/Booking');
 
-// MongoDB connection
-mongoose.connect('mongodb://localhost:27017/rentrider', {
+// Load environment variables
+require('dotenv').config();
+
+// MongoDB Atlas connection
+mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 });
