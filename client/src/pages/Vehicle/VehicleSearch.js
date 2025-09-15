@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useSecureAuth } from '../../context/SecureAuthContext';
 import { vehicleService } from '../../services/vehicleService';
+import LocationAutocomplete from '../../components/LocationAutocomplete';
 
 const VehicleSearch = () => {
   const { isAuthenticated } = useSecureAuth();
@@ -110,10 +111,11 @@ const VehicleSearch = () => {
       console.error('Error fetching vehicles:', error);
       setError('Failed to fetch vehicles. Please try again.');
       
-      // Fallback to mock data
-      setVehicles([
+      // Fallback to mock data representing all vehicles from server
+      const allServerVehicles = [
         {
           _id: 'V001',
+          name: 'Royal Enfield Classic 350',
           brand: 'Royal Enfield',
           model: 'Classic 350',
           type: 'motorcycle',
@@ -127,34 +129,135 @@ const VehicleSearch = () => {
             coordinates: { latitude: 19.0544, longitude: 72.8406 }
           },
           rating: { average: 4.8, count: 156 },
-          features: ['GPS', 'Bluetooth', 'USB Charging'],
+          features: ['Bluetooth', 'Anti-theft Alarm'],
           images: [{ url: '/api/placeholder/300/200' }],
           availability: { isAvailable: true },
           owner: { name: 'Rajesh Kumar', rating: 4.9 },
-          distance: 2.3
+          distance: filters.location ? 2.3 : null
         },
         {
           _id: 'V002',
+          name: 'Honda Activa 6G',
           brand: 'Honda',
           model: 'Activa 6G',
           type: 'scooter',
-          year: 2022,
+          year: 2023,
           fuelType: 'petrol',
-          pricing: { hourlyRate: 60, dailyRate: 400 },
+          pricing: { hourlyRate: 40, dailyRate: 300 },
           location: { 
-            address: 'Andheri East', 
+            address: 'Bandra West', 
             city: 'Mumbai', 
             state: 'Maharashtra',
-            coordinates: { latitude: 19.1136, longitude: 72.8697 }
+            coordinates: { latitude: 19.0544, longitude: 72.8406 }
           },
           rating: { average: 4.6, count: 234 },
           features: ['Helmet Storage', 'Mobile Holder'],
           images: [{ url: '/api/placeholder/300/200' }],
           availability: { isAvailable: true },
           owner: { name: 'Priya Sharma', rating: 4.7 },
-          distance: 3.1
+          distance: filters.location ? 1.2 : null
+        },
+        {
+          _id: 'V003',
+          name: 'TVS Jupiter',
+          brand: 'TVS',
+          model: 'Jupiter',
+          type: 'scooter',
+          year: 2022,
+          fuelType: 'petrol',
+          pricing: { hourlyRate: 35, dailyRate: 250 },
+          location: { 
+            address: 'Andheri East', 
+            city: 'Mumbai', 
+            state: 'Maharashtra',
+            coordinates: { latitude: 19.1136, longitude: 72.8697 }
+          },
+          rating: { average: 4.4, count: 89 },
+          features: ['GPS', 'USB Charging'],
+          images: [{ url: '/api/placeholder/300/200' }],
+          availability: { isAvailable: true },
+          owner: { name: 'Amit Singh', rating: 4.5 },
+          distance: filters.location ? 3.1 : null
+        },
+        {
+          _id: 'V004',
+          name: 'Royal Enfield Classic 350',
+          brand: 'Royal Enfield',
+          model: 'Classic 350',
+          type: 'motorcycle',
+          year: 2023,
+          fuelType: 'petrol',
+          pricing: { hourlyRate: 100, dailyRate: 800 },
+          location: { 
+            address: 'Koregaon Park', 
+            city: 'Pune', 
+            state: 'Maharashtra',
+            coordinates: { latitude: 18.5362, longitude: 73.8958 }
+          },
+          rating: { average: 4.9, count: 67 },
+          features: ['Bluetooth', 'Anti-theft Alarm'],
+          images: [{ url: '/api/placeholder/300/200' }],
+          availability: { isAvailable: true },
+          owner: { name: 'Vikram Patil', rating: 4.8 },
+          distance: filters.location ? 5.2 : null
+        },
+        {
+          _id: 'V005',
+          name: 'Bajaj Pulsar NS200',
+          brand: 'Bajaj',
+          model: 'Pulsar NS200',
+          type: 'motorcycle',
+          year: 2022,
+          fuelType: 'petrol',
+          pricing: { hourlyRate: 80, dailyRate: 600 },
+          location: { 
+            address: 'Whitefield', 
+            city: 'Bangalore', 
+            state: 'Karnataka',
+            coordinates: { latitude: 12.9698, longitude: 77.7500 }
+          },
+          rating: { average: 4.5, count: 89 },
+          features: ['GPS', 'Mobile Holder'],
+          images: [{ url: '/api/placeholder/300/200' }],
+          availability: { isAvailable: true },
+          owner: { name: 'Suresh Kumar', rating: 4.6 },
+          distance: filters.location ? null : null
+        },
+        {
+          _id: 'V006',
+          name: 'Yamaha FZ-S',
+          brand: 'Yamaha',
+          model: 'FZ-S',
+          type: 'motorcycle',
+          year: 2023,
+          fuelType: 'petrol',
+          pricing: { hourlyRate: 90, dailyRate: 700 },
+          location: { 
+            address: 'Connaught Place', 
+            city: 'Delhi', 
+            state: 'Delhi',
+            coordinates: { latitude: 28.6315, longitude: 77.2167 }
+          },
+          rating: { average: 4.7, count: 123 },
+          features: ['Bluetooth', 'USB Charging', 'Anti-theft Alarm'],
+          images: [{ url: '/api/placeholder/300/200' }],
+          availability: { isAvailable: true },
+          owner: { name: 'Rohit Sharma', rating: 4.8 },
+          distance: filters.location ? null : null
         }
-      ]);
+      ];
+      
+      // Show all vehicles if no location filter, otherwise filter by location
+      let filteredVehicles = allServerVehicles;
+      if (filters.location && filters.location.trim()) {
+        const searchLocation = filters.location.toLowerCase();
+        filteredVehicles = allServerVehicles.filter(vehicle => 
+          vehicle.location.address.toLowerCase().includes(searchLocation) ||
+          vehicle.location.city.toLowerCase().includes(searchLocation)
+        );
+      }
+      
+      setVehicles(filteredVehicles);
     } finally {
       setLoading(false);
     }
@@ -296,6 +399,19 @@ const VehicleSearch = () => {
           <div className="bg-white rounded-lg shadow-md p-6 mb-8">
             <h3 className="text-lg font-semibold mb-4">Filter Options</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              
+              {/* Location Filter */}
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Location
+                </label>
+                <LocationAutocomplete
+                  placeholder="Search by city or area"
+                  onLocationSelect={(location) => {
+                    handleFilterChange('location', location.address);
+                  }}
+                />
+              </div>
               
               {/* Vehicle Type */}
               <div>
@@ -508,14 +624,14 @@ const VehicleSearch = () => {
                   {/* Action Buttons */}
                   <div className="flex space-x-2">
                     <Link
-                      to={`/vehicle/${vehicle._id}`}
+                      to={`/vehicles/${vehicle._id}`}
                       className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors text-center font-medium"
                     >
                       View Details
                     </Link>
                     {vehicle.availability?.isAvailable && (
                       <Link
-                        to={isAuthenticated ? `/booking/${vehicle._id}` : '/login'}
+                        to={isAuthenticated ? `/book/${vehicle._id}` : '/login'}
                         className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors text-center font-medium"
                       >
                         Book Now

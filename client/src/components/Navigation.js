@@ -77,7 +77,7 @@ const UserAvatar = memo(({ user, onClick, showDropdown, onLogout, setShowDropdow
             <p className="text-sm font-semibold text-gray-900">
               {user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'User'}
             </p>
-            <p className="text-xs text-gray-500 capitalize">{user.role || 'Member'}</p>
+            <p className="text-xs text-gray-500 capitalize">{user.role || user.userType || 'Member'}</p>
           </div>
         </div>
         <Link
@@ -148,11 +148,21 @@ const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
+  const [forceUpdate, setForceUpdate] = useState(0);
+  const [currentUser, setCurrentUser] = useState(null);
   const { user, logout, refreshUser } = useSecureAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
   const debouncedSearch = useDebounce(searchQuery, 300);
+
+  // Track user changes and force updates
+  useEffect(() => {
+    if (user !== currentUser) {
+      setCurrentUser(user);
+      setForceUpdate(prev => prev + 1);
+    }
+  }, [user, currentUser]);
 
   // Navigation Items Configuration
   const navConfig = useMemo(() => ({
@@ -170,18 +180,19 @@ const Navigation = () => {
       { name: 'Support', path: '/support', icon: 'support' }
     ],
     owner: [
+      { name: 'Dashboard', path: '/owner', icon: 'home' },
       { name: 'My Vehicles', path: '/owner/vehicles', icon: 'vehicle' },
       { name: 'Add Vehicle', path: '/owner/add-vehicle', icon: 'add' },
       { name: 'Bookings', path: '/owner/bookings', icon: 'booking' },
-      { name: 'Earnings', path: '/owner/earnings', icon: 'earnings' },
-      { name: 'Support', path: '/support', icon: 'support' }
+      { name: 'Earnings', path: '/owner/earnings', icon: 'earnings' }
     ]
   }), []);
 
   const navigationItems = useMemo(() => {
-    if (!user) return navConfig.universal;
-    return user.role === 'owner' ? navConfig.owner : navConfig.renter;
-  }, [user?.role, navConfig]);
+    const activeUser = currentUser || user;
+    if (!activeUser) return navConfig.universal;
+    return activeUser.role === 'owner' ? navConfig.owner : navConfig.renter;
+  }, [currentUser?.role, currentUser?.userType, user?.role, user?.userType, navConfig, forceUpdate]);
 
   // Event Handlers
   const handleSearch = useCallback((e) => {
@@ -202,14 +213,41 @@ const Navigation = () => {
 
   const isActivePath = useCallback((path) => location.pathname === path, [location.pathname]);
 
-  // Listen for profile updates
+  // Listen for profile updates and force re-renders
   useEffect(() => {
-    const handleProfileUpdate = () => {
+    const handleProfileUpdate = (event) => {
+      // Force immediate refresh if user data is provided
+      if (event.detail) {
+        // Trigger a state update to force re-render
+        setForceUpdate(prev => prev + 1);
+        setShowDropdown(false);
+      }
       refreshUser();
     };
 
+    const handleAuthUpdate = (event) => {
+      if (event.detail) {
+        // Force component re-render by updating local state
+        setForceUpdate(prev => prev + 1);
+        setShowDropdown(false);
+      }
+    };
+
+    const handleUserRefresh = () => {
+      // Force re-render by toggling a state
+      setForceUpdate(prev => prev + 1);
+      setShowDropdown(false);
+    };
+
     window.addEventListener('profile:updated', handleProfileUpdate);
-    return () => window.removeEventListener('profile:updated', handleProfileUpdate);
+    window.addEventListener('auth:update', handleAuthUpdate);
+    window.addEventListener('user:refreshed', handleUserRefresh);
+    
+    return () => {
+      window.removeEventListener('profile:updated', handleProfileUpdate);
+      window.removeEventListener('auth:update', handleAuthUpdate);
+      window.removeEventListener('user:refreshed', handleUserRefresh);
+    };
   }, [refreshUser]);
 
   // Close dropdown on outside click
@@ -222,7 +260,10 @@ const Navigation = () => {
   }, [showDropdown]);
 
   return (
-    <nav className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+    <nav 
+      key={`nav-${forceUpdate}-${(currentUser || user)?.id}-${(currentUser || user)?.role}`}
+      className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm"
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           
@@ -236,7 +277,7 @@ const Navigation = () => {
           </Link>
 
           {/* Desktop Search - Hidden on mobile */}
-          {user && (
+          {(currentUser || user) && (
             <div className="hidden lg:flex flex-1 max-w-md mx-8">
               <form onSubmit={handleSearch} className="w-full">
                 <div className="relative">
@@ -264,7 +305,7 @@ const Navigation = () => {
             ))}
 
             {/* Auth Section */}
-            {!user ? (
+            {!(currentUser || user) ? (
               <Link
                 to="/login"
                 className="ml-4 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
@@ -274,7 +315,8 @@ const Navigation = () => {
             ) : (
               <div className="ml-4" onClick={(e) => e.stopPropagation()}>
                 <UserAvatar
-                  user={user}
+                  key={`desktop-${forceUpdate}-${(currentUser || user)?.role}-${(currentUser || user)?.userType}`}
+                  user={currentUser || user}
                   onClick={() => setShowDropdown(!showDropdown)}
                   showDropdown={showDropdown}
                   onLogout={handleLogout}
@@ -298,7 +340,7 @@ const Navigation = () => {
           <div className="lg:hidden py-4 border-t border-gray-200">
             
             {/* Mobile Search */}
-            {user && (
+            {(currentUser || user) && (
               <div className="mb-4">
                 <form onSubmit={handleSearch}>
                   <div className="relative">
@@ -328,7 +370,7 @@ const Navigation = () => {
             </div>
             
             {/* Mobile Auth Section */}
-            {!user ? (
+            {!(currentUser || user) ? (
               <div className="mt-4 pt-4 border-t border-gray-200">
                 <Link
                   to="/login"
@@ -340,7 +382,8 @@ const Navigation = () => {
               </div>
             ) : (
               <UserAvatar
-                user={user}
+                key={`mobile-${forceUpdate}-${(currentUser || user)?.role}-${(currentUser || user)?.userType}`}
+                user={currentUser || user}
                 onClick={() => setIsOpen(false)}
                 onLogout={handleLogout}
                 isMobile={true}

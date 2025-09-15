@@ -121,30 +121,58 @@ const userSchema = new mongoose.Schema({
     currency: { type: String, default: 'INR' },
     language: { type: String, default: 'en' }
   },
-  // For owners
-  ownerDetails: {
+  // Personal Details Section
+  personalDetails: {
     aadharNumber: {
       type: String,
       validate: {
         validator: function(v) {
-          if (this.role === 'owner') {
-            return v && /^\d{12}$/.test(v);
+          if (v && v.trim()) {
+            return /^\d{12}$/.test(v);
           }
           return true;
         },
-        message: 'Valid 12-digit Aadhar number is required for owners'
+        message: 'Aadhar number must be exactly 12 digits'
       }
     },
     panNumber: {
       type: String,
       validate: {
         validator: function(v) {
-          if (this.role === 'owner') {
-            return v && /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(v);
+          if (v && v.trim()) {
+            return /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(v);
           }
           return true;
         },
-        message: 'Valid PAN number is required for owners'
+        message: 'PAN number must follow format ABCDE1234F'
+      }
+    }
+  },
+
+  // For owners
+  ownerDetails: {
+    aadharNumber: {
+      type: String,
+      validate: {
+        validator: function(v) {
+          if (v && v.trim()) {
+            return /^\d{12}$/.test(v);
+          }
+          return true;
+        },
+        message: 'Aadhar number must be exactly 12 digits'
+      }
+    },
+    panNumber: {
+      type: String,
+      validate: {
+        validator: function(v) {
+          if (v && v.trim()) {
+            return /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(v);
+          }
+          return true;
+        },
+        message: 'PAN number must follow format ABCDE1234F'
       }
     },
     vehicleRegistration: {
@@ -192,11 +220,11 @@ const userSchema = new mongoose.Schema({
         validate: {
           validator: function(v) {
             if (this.parent().parent().role === 'owner') {
-              return v && /^[A-Z]{4}0[A-Z0-9]{6}$/.test(v);
+              return v && v.trim().length > 0;
             }
             return true;
           },
-          message: 'Valid IFSC code is required for owners'
+          message: 'IFSC code is required for owners'
         }
       },
       accountHolderName: {

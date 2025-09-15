@@ -160,16 +160,25 @@ const vehicleSchema = new mongoose.Schema({
     default: 0
   },
   documents: {
-    registrationCertificate: String,
-    insurance: {
-      policyNumber: String,
-      expiryDate: Date,
-      documentUrl: String
+    registration: {
+      url: String,
+      originalName: String,
+      uploadedAt: Date
     },
-    pollution: {
-      certificateNumber: String,
-      expiryDate: Date,
-      documentUrl: String
+    insurance: {
+      url: String,
+      originalName: String,
+      uploadedAt: Date
+    },
+    permit: {
+      url: String,
+      originalName: String,
+      uploadedAt: Date
+    },
+    puc: {
+      url: String,
+      originalName: String,
+      uploadedAt: Date
     }
   },
   verification: {

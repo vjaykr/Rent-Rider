@@ -99,8 +99,6 @@ const ProfileCompletion = () => {
       
       if (!formData.ownerDetails.bankDetails.ifscCode) {
         errors.ifscCode = 'IFSC code is required for owners';
-      } else if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(formData.ownerDetails.bankDetails.ifscCode)) {
-        errors.ifscCode = 'Invalid IFSC code format';
       }
       
       if (!formData.ownerDetails.bankDetails.accountHolderName) {
@@ -131,7 +129,9 @@ const ProfileCompletion = () => {
     } else if (name === 'ownerDetails.bankDetails.accountNumber') {
       value = value.replace(/\D/g, '');
     } else if (name === 'ownerDetails.bankDetails.ifscCode') {
-      value = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11);
+      value = value.toUpperCase();
+    } else if (name === 'ownerDetails.bankDetails.accountHolderName') {
+      value = value.toUpperCase();
     } else if (name === 'phone') {
       value = value.replace(/\D/g, '').slice(0, 10);
     } else if (name === 'drivingLicense.number') {

@@ -54,7 +54,7 @@ const createUserFromGoogle = (googleData, additionalData = {}) => {
     isEmailVerified: true,
     isPhoneVerified: !!phone_number,
     profileCompleted: false,
-    password: 'google_auth'
+    password: process.env.GOOGLE_AUTH_DEFAULT_PASSWORD || 'google_auth_secure'
   };
 };
 

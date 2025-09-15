@@ -87,8 +87,9 @@ class AtlasMigration {
         
         try {
           // Check if documents already exist in Atlas
+          const batchIds = batch.map(doc => mongoose.Types.ObjectId(doc._id));
           const existingIds = await AtlasModel.find({
-            _id: { $in: batch.map(doc => doc._id) }
+            _id: { $in: batchIds }
           }).distinct('_id');
           
           // Filter out existing documents

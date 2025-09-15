@@ -253,10 +253,10 @@ export const SecureAuthProvider = ({ children }) => {
       if (response.success) {
         // Force immediate state update
         dispatch({ type: AUTH_ACTIONS.LOGIN_SUCCESS, payload: { user: response.user } });
-        // Emit event to update navbar immediately
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('profile:updated'));
-        }, 100);
+        // Emit multiple events to ensure navbar updates
+        window.dispatchEvent(new CustomEvent('profile:updated', { detail: response.user }));
+        window.dispatchEvent(new CustomEvent('auth:update', { detail: response.user }));
+        window.dispatchEvent(new CustomEvent('user:refreshed', { detail: response.user }));
         showToast.success('Profile updated successfully!');
         return response;
       } else {
@@ -286,6 +286,8 @@ export const SecureAuthProvider = ({ children }) => {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
+      // Clear localStorage token
+      localStorage.removeItem('token');
       dispatch({ type: AUTH_ACTIONS.LOGOUT });
     }
   };
@@ -301,8 +303,9 @@ export const SecureAuthProvider = ({ children }) => {
       const response = await secureAuthService.getCurrentUser();
       if (response.success) {
         dispatch({ type: AUTH_ACTIONS.LOGIN_SUCCESS, payload: { user: response.user } });
-        // Force component re-render
-        window.dispatchEvent(new CustomEvent('user:refreshed'));
+        // Force component re-render with updated user data
+        window.dispatchEvent(new CustomEvent('user:refreshed', { detail: response.user }));
+        return response.user;
       }
     } catch (error) {
       console.error('Failed to refresh user data:', error);

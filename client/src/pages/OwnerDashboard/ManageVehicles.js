@@ -1,181 +1,157 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { toast } from 'react-hot-toast';
-import { ownerService } from '../../services/ownerService';
-import { format } from 'date-fns';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { showToast } from '../../components/CustomToast';
+import { useSecureAuth } from '../../context/SecureAuthContext';
+import { vehicleService } from '../../services/vehicleService';
 
 const ManageVehicles = () => {
+  const { user } = useSecureAuth();
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState('all');
-  const [sortConfig, setSortConfig] = useState({ key: 'createdAt', direction: 'desc' });
-  const [searchTerm, setSearchTerm] = useState('');
-  const [deleteLoading, setDeleteLoading] = useState({});
-  const [statusLoading, setStatusLoading] = useState({});
-  const navigate = useNavigate();
+
+  // Mock data for now - replace with actual API call when backend is ready
+  const mockVehicles = [
+    {
+      id: '1',
+      name: 'Honda Activa 6G',
+      brand: 'Honda',
+      model: 'Activa 6G',
+      year: '2023',
+      type: 'scooter',
+      fuelType: 'petrol',
+      pricePerDay: 300,
+      status: 'Available',
+      bookings: 15,
+      earnings: 4500,
+      registrationNumber: 'MH12AB1234',
+      location: 'Bandra West, Mumbai',
+      features: ['Helmet Storage', 'Mobile Holder']
+    },
+    {
+      id: '2',
+      name: 'TVS Jupiter',
+      brand: 'TVS',
+      model: 'Jupiter',
+      year: '2022',
+      type: 'scooter',
+      fuelType: 'petrol',
+      pricePerDay: 250,
+      status: 'Rented',
+      bookings: 8,
+      earnings: 2000,
+      registrationNumber: 'MH12CD5678',
+      location: 'Andheri East, Mumbai',
+      features: ['GPS', 'USB Charging']
+    },
+    {
+      id: '3',
+      name: 'Royal Enfield Classic 350',
+      brand: 'Royal Enfield',
+      model: 'Classic 350',
+      year: '2023',
+      type: 'motorcycle',
+      fuelType: 'petrol',
+      pricePerDay: 800,
+      status: 'Available',
+      bookings: 12,
+      earnings: 9600,
+      registrationNumber: 'MH14EF9012',
+      location: 'Koregaon Park, Pune',
+      features: ['Bluetooth', 'Anti-theft Alarm']
+    }
+  ];
 
   const fetchVehicles = async () => {
     try {
       setLoading(true);
-      const response = await ownerService.getOwnerVehicles();
+      
+      // Check if user is authenticated and is owner
+      if (!user || user.role !== 'owner') {
+        showToast.error('Owner access required');
+        setVehicles([]);
+        return;
+      }
+      
+      const response = await vehicleService.getOwnerVehicles();
+      
       if (response.success) {
-        setVehicles(response.data.vehicles || []);
+        setVehicles(response.data || []);
       } else {
-        toast.error('Failed to fetch vehicles');
+        // Fallback to mock data if API fails
+        setVehicles(mockVehicles);
+        showToast.info('Using sample data. Connect to server for real data.');
       }
     } catch (error) {
       console.error('Error fetching vehicles:', error);
-      toast.error('An error occurred while fetching vehicles');
+      
+      // Check if it's an auth error
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        showToast.error('Authentication required. Please login as owner.');
+        setVehicles([]);
+      } else {
+        setVehicles(mockVehicles);
+        showToast.info('Using sample data. Check server connection.');
+      }
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchVehicles();
-  }, []);
+    if (user) {
+      fetchVehicles();
+    }
+  }, [user]);
   
-  const filteredAndSortedVehicles = useMemo(() => {
-    // Filter vehicles
-    let result = [...vehicles];
-    
-    // Apply status filter
-    if (filterStatus !== 'all') {
-      result = result.filter(vehicle => 
-        vehicle.availability?.status?.toLowerCase() === filterStatus.toLowerCase()
-      );
-    }
-    
-    // Apply search term
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      result = result.filter(vehicle => 
-        vehicle.name?.toLowerCase().includes(term) ||
-        vehicle.brand?.toLowerCase().includes(term) ||
-        vehicle.model?.toLowerCase().includes(term) ||
-        vehicle.registrationNumber?.toLowerCase().includes(term)
-      );
-    }
-    
-    // Apply sorting
-    if (sortConfig.key) {
-      result.sort((a, b) => {
-        let aValue = a[sortConfig.key];
-        let bValue = b[sortConfig.key];
-        
-        // Handle nested properties
-        if (sortConfig.key.includes('.')) {
-          const keys = sortConfig.key.split('.');
-          aValue = keys.reduce((obj, key) => obj?.[key], a);
-          bValue = keys.reduce((obj, key) => obj?.[key], b);
-        }
-        
-        // Convert to string and lowercase for case-insensitive comparison
-        if (typeof aValue === 'string') aValue = aValue.toString().toLowerCase();
-        if (typeof bValue === 'string') bValue = bValue.toString().toLowerCase();
-        
-        if (aValue < bValue) {
-          return sortConfig.direction === 'asc' ? -1 : 1;
-        }
-        if (aValue > bValue) {
-          return sortConfig.direction === 'asc' ? 1 : -1;
-        }
-        return 0;
-      });
-    }
-    
-    return result;
-  }, [vehicles, filterStatus, searchTerm, sortConfig]);
+  const filteredVehicles = vehicles.filter(vehicle => {
+    if (filterStatus === 'all') return true;
+    return vehicle.status.toLowerCase() === filterStatus.toLowerCase();
+  });
   
-  const requestSort = (key) => {
-    let direction = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
-    setSortConfig({ key, direction });
-  };
-  
-  const getSortIndicator = (key) => {
-    if (sortConfig.key !== key) return null;
-    return sortConfig.direction === 'asc' ? '↑' : '↓';
-  };
-
   const handleStatusChange = async (vehicleId, newStatus) => {
     try {
-      setStatusLoading(prev => ({ ...prev, [vehicleId]: true }));
-      
-      const response = await ownerService.updateVehicle(vehicleId, {
-        'availability.status': newStatus
-      });
+      const response = await vehicleService.updateVehicle(vehicleId, { status: newStatus });
       
       if (response.success) {
-        await fetchVehicles();
-        toast.success('Vehicle status updated successfully');
+        setVehicles(prev => prev.map(vehicle => 
+          vehicle.id === vehicleId || vehicle._id === vehicleId 
+            ? { ...vehicle, status: newStatus } 
+            : vehicle
+        ));
+        showToast.success('Vehicle status updated successfully');
       } else {
-        toast.error(response.message || 'Failed to update vehicle status');
+        showToast.error(response.message || 'Failed to update vehicle status');
       }
     } catch (error) {
       console.error('Error updating vehicle status:', error);
-      toast.error('An error occurred while updating vehicle status');
-    } finally {
-      setStatusLoading(prev => ({ ...prev, [vehicleId]: false }));
+      showToast.error('Failed to update vehicle status');
     }
   };
 
   const handleDeleteVehicle = async (vehicleId) => {
-    if (!window.confirm('Are you sure you want to delete this vehicle? This action cannot be undone.')) {
+    if (!window.confirm('Are you sure you want to delete this vehicle?')) {
       return;
     }
     
     try {
-      setDeleteLoading(prev => ({ ...prev, [vehicleId]: true }));
-      
-      const response = await ownerService.deleteVehicle(vehicleId);
+      const response = await vehicleService.deleteVehicle(vehicleId);
       
       if (response.success) {
-        await fetchVehicles();
-        toast.success('Vehicle deleted successfully');
+        setVehicles(prev => prev.filter(vehicle => 
+          vehicle.id !== vehicleId && vehicle._id !== vehicleId
+        ));
+        showToast.success('Vehicle deleted successfully');
       } else {
-        toast.error(response.message || 'Failed to delete vehicle');
+        showToast.error(response.message || 'Failed to delete vehicle');
       }
     } catch (error) {
       console.error('Error deleting vehicle:', error);
-      toast.error('An error occurred while deleting the vehicle');
-    } finally {
-      setDeleteLoading(prev => ({ ...prev, [vehicleId]: false }));
+      showToast.error('Failed to delete vehicle');
     }
   };
   
-  const getStatusBadge = (status) => {
-    const statusMap = {
-      available: { text: 'Available', color: 'bg-green-100 text-green-800' },
-      rented: { text: 'Rented', color: 'bg-blue-100 text-blue-800' },
-      maintenance: { text: 'Under Maintenance', color: 'bg-yellow-100 text-yellow-800' },
-      unavailable: { text: 'Unavailable', color: 'bg-red-100 text-red-800' },
-    };
-    
-    const statusInfo = statusMap[status?.toLowerCase()] || { text: 'Unknown', color: 'bg-gray-100 text-gray-800' };
-    
-    return (
-      <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusInfo.color}`}>
-        {statusInfo.text}
-      </span>
-    );
-  };
-  
-  const getStatusOptions = (currentStatus) => {
-    const allStatuses = [
-      { value: 'available', label: 'Available' },
-      { value: 'rented', label: 'Rented' },
-      { value: 'maintenance', label: 'Under Maintenance' },
-      { value: 'unavailable', label: 'Unavailable' },
-    ];
-    
-    return allStatuses.map(option => ({
-      ...option,
-      disabled: option.value === currentStatus?.toLowerCase()
-    }));
-  };
+
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -246,7 +222,7 @@ const ManageVehicles = () => {
       </div>
 
       {/* Vehicle Cards */}
-      {filteredAndSortedVehicles.length === 0 ? (
+      {filteredVehicles.length === 0 ? (
         <div className="text-center py-12">
           <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -262,7 +238,7 @@ const ManageVehicles = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredAndSortedVehicles.map((vehicle) => (
+          {filteredVehicles.map((vehicle) => (
             <div key={vehicle.id} className="bg-white rounded-lg shadow-md overflow-hidden">
               <div className="h-48 bg-gray-200 flex items-center justify-center">
                 <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -278,7 +254,14 @@ const ManageVehicles = () => {
                   </span>
                 </div>
                 
-                <p className="text-gray-600 mb-2">{vehicle.brand} {vehicle.model} ({vehicle.year})</p>
+                <p className="text-gray-600 mb-1">{vehicle.brand} {vehicle.model} ({vehicle.year})</p>
+                <p className="text-sm text-gray-500 mb-2 flex items-center">
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  {vehicle.location}
+                </p>
                 <p className="text-blue-600 font-semibold mb-4">₹{vehicle.pricePerDay}/day</p>
                 
                 <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
@@ -294,11 +277,14 @@ const ManageVehicles = () => {
                 
                 <div className="flex justify-between items-center">
                   <div className="flex space-x-2">
-                    <button className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+                    <button 
+                      onClick={() => showToast.info('Edit feature coming soon!')}
+                      className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                    >
                       Edit
                     </button>
                     <button 
-                      onClick={() => handleDeleteVehicle(vehicle.id)}
+                      onClick={() => handleDeleteVehicle(vehicle.id || vehicle._id)}
                       className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
                     >
                       Delete
@@ -307,7 +293,7 @@ const ManageVehicles = () => {
                   
                   <select
                     value={vehicle.status}
-                    onChange={(e) => handleStatusChange(vehicle.id, e.target.value)}
+                    onChange={(e) => handleStatusChange(vehicle.id || vehicle._id, e.target.value)}
                     className="text-sm border border-gray-300 rounded px-2 py-1"
                   >
                     <option value="Available">Available</option>

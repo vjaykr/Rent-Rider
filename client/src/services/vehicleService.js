@@ -2,7 +2,7 @@ import api from './api';
 
 // Vehicle service functions
 export const vehicleService = {
-  // Get all vehicles with filters
+  // Get all vehicles with filters (PUBLIC - no auth required)
   getVehicles: async (filters = {}) => {
     try {
       const {
@@ -17,7 +17,7 @@ export const vehicleService = {
         availability = 'available',
         sortBy = 'price',
         page = 1,
-        limit = 10
+        limit = 20
       } = filters;
 
       // Build query parameters
@@ -36,16 +36,24 @@ export const vehicleService = {
       if (page) queryParams.append('page', page);
       if (limit) queryParams.append('limit', limit);
 
-      const response = await api.get(`/vehicles?${queryParams.toString()}`);
+      // Use public API endpoint (no auth required)
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/vehicles?${queryParams.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
       
-      if (response.data.success) {
+      const data = await response.json();
+      
+      if (data.success) {
         return {
           success: true,
-          data: response.data.data,
-          message: response.data.message
+          data: data.data,
+          message: data.message
         };
       } else {
-        throw new Error(response.data.message || 'Failed to fetch vehicles');
+        throw new Error(data.message || 'Failed to fetch vehicles');
       }
     } catch (error) {
       console.error('Error fetching vehicles:', error);
@@ -190,6 +198,70 @@ export const vehicleService = {
     } catch (error) {
       console.error('Error fetching vehicle:', error);
       throw error;
+    }
+  },
+
+  // Add new vehicle (Owner only)
+  addVehicle: async (vehicleData) => {
+    try {
+      const response = await api.post('/vehicles', vehicleData);
+      return response.data;
+    } catch (error) {
+      console.error('Error adding vehicle:', error);
+      throw error;
+    }
+  },
+
+  // Add new vehicle with images (Owner only)
+  addVehicleWithImages: async (formData) => {
+    try {
+      const response = await api.post('/vehicles', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error adding vehicle with images:', error);
+      throw error;
+    }
+  },
+
+  // Update vehicle (Owner only)
+  updateVehicle: async (vehicleId, updateData) => {
+    try {
+      const response = await api.put(`/vehicles/${vehicleId}`, updateData);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating vehicle:', error);
+      throw error;
+    }
+  },
+
+  // Delete vehicle (Owner only)
+  deleteVehicle: async (vehicleId) => {
+    try {
+      const response = await api.delete(`/vehicles/${vehicleId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting vehicle:', error);
+      throw error;
+    }
+  },
+
+  // Get owner's vehicles (requires authentication)
+  getOwnerVehicles: async () => {
+    try {
+      const response = await api.get('/vehicles/owner/my-vehicles');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching owner vehicles:', error);
+      // Return empty array instead of throwing to prevent logout
+      return {
+        success: false,
+        data: [],
+        message: error.response?.data?.message || 'Failed to fetch vehicles'
+      };
     }
   },
 

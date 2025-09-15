@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Vehicle Upload with Documents</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .form-group { margin: 15px 0; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select, textarea { width: 300px; padding: 8px; margin-bottom: 10px; }
+        button { padding: 10px 20px; background: #007bff; color: white; border: none; cursor: pointer; }
+        .section { border: 1px solid #ddd; padding: 15px; margin: 15px 0; }
+        .section h3 { margin-top: 0; color: #333; }
+    </style>
+</head>
+<body>
+    <h1>Test Vehicle Upload with Images and Documents</h1>
+    
+    <form id="vehicleForm" enctype="multipart/form-data">
+        <div class="section">
+            <h3>Basic Information</h3>
+            <div class="form-group">
+                <label>Vehicle Name:</label>
+                <input type="text" name="name" value="Test Vehicle" required>
+            </div>
+            <div class="form-group">
+                <label>Brand:</label>
+                <input type="text" name="brand" value="Honda" required>
+            </div>
+            <div class="form-group">
+                <label>Model:</label>
+                <input type="text" name="model" value="Activa" required>
+            </div>
+            <div class="form-group">
+                <label>Type:</label>
+                <select name="type" required>
+                    <option value="Scooter">Scooter</option>
+                    <option value="Bike">Bike</option>
+                    <option value="Car">Car</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Year:</label>
+                <input type="number" name="year" value="2023" required>
+            </div>
+            <div class="form-group">
+                <label>Fuel Type:</label>
+                <select name="fuelType" required>
+                    <option value="Petrol">Petrol</option>
+                    <option value="Electric">Electric</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Transmission:</label>
+                <select name="transmission" required>
+                    <option value="Automatic">Automatic</option>
+                    <option value="Manual">Manual</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Seating Capacity:</label>
+                <input type="number" name="seatingCapacity" value="2" required>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Pricing</h3>
+            <div class="form-group">
+                <label>Price per Hour (₹):</label>
+                <input type="number" name="pricing[hourlyRate]" value="50" required>
+            </div>
+            <div class="form-group">
+                <label>Price per Day (₹):</label>
+                <input type="number" name="pricing[dailyRate]" value="400" required>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Location & Description</h3>
+            <div class="form-group">
+                <label>Location:</label>
+                <input type="text" name="location" value="Bandra West, Mumbai" required>
+            </div>
+            <div class="form-group">
+                <label>Description:</label>
+                <textarea name="description">Well maintained vehicle in excellent condition.</textarea>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Vehicle Images</h3>
+            <div class="form-group">
+                <label>Upload Vehicle Photos:</label>
+                <input type="file" name="images" multiple accept="image/*">
+                <small>Select multiple images of your vehicle</small>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Vehicle Documents</h3>
+            <div class="form-group">
+                <label>Registration Certificate (RC):</label>
+                <input type="file" name="documents[registration]" accept=".pdf,.jpg,.jpeg,.png" required>
+            </div>
+            <div class="form-group">
+                <label>Insurance Certificate:</label>
+                <input type="file" name="documents[insurance]" accept=".pdf,.jpg,.jpeg,.png" required>
+            </div>
+            <div class="form-group">
+                <label>Commercial Permit (if applicable):</label>
+                <input type="file" name="documents[permit]" accept=".pdf,.jpg,.jpeg,.png">
+            </div>
+            <div class="form-group">
+                <label>Pollution Certificate (PUC):</label>
+                <input type="file" name="documents[puc]" accept=".pdf,.jpg,.jpeg,.png">
+            </div>
+        </div>
+
+        <button type="submit">Add Vehicle</button>
+    </form>
+
+    <div id="result" style="margin-top: 20px;"></div>
+
+    <script>
+        document.getElementById('vehicleForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const resultDiv = document.getElementById('result');
+            
+            // Add features
+            formData.append('features[]', 'GPS');
+            formData.append('features[]', 'Bluetooth');
+            formData.append('availability', 'true');
+            
+            try {
+                resultDiv.innerHTML = '<p>Uploading vehicle...</p>';
+                
+                const response = await fetch('http://localhost:5001/api/vehicles', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'Authorization': 'Bearer YOUR_TOKEN_HERE' // Replace with actual token
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    resultDiv.innerHTML = `
+                        <div style="color: green;">
+                            <h3>✅ Vehicle Added Successfully!</h3>
+                            <p><strong>Message:</strong> ${result.message}</p>
+                            <p><strong>Vehicle ID:</strong> ${result.data._id}</p>
+                            <p><strong>Images:</strong> ${result.data.images.length} uploaded</p>
+                            <p><strong>Documents:</strong> ${Object.keys(result.data.documents || {}).length} uploaded</p>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div style="color: red;">
+                            <h3>❌ Upload Failed</h3>
+                            <p><strong>Error:</strong> ${result.message}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div style="color: red;">
+                        <h3>❌ Network Error</h3>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                    </div>
+                `;
+            }
+        });
+    </script>
+</body>
+</html>

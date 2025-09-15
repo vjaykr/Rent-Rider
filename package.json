@@ -17,6 +17,7 @@
     "test:auth": "cd server && curl http://localhost:5001/api/auth/health",
     "setup:firebase": "echo 'Follow FIREBASE_MONGODB_SETUP.md for complete setup instructions'",
     "setup:complete": "npm run install:all && npm run setup:env && npm run setup:firebase",
+    "setup:mock-data": "node setup-mock-data.js",
     "network:ip": "node get-network-ip.js"
   },
   "keywords": [

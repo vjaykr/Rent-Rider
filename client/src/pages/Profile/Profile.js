@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useSecureAuth } from '../../context/SecureAuthContext';
 import { secureAuthService } from '../../services/secureAuthService';
 import { showToast } from '../../components/CustomToast';
+import LocationAutocomplete from '../../components/LocationAutocomplete';
 
 const Profile = () => {
-  const { user } = useSecureAuth();
+  const { user, updateProfile: updateUserProfile } = useSecureAuth();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -26,8 +27,9 @@ const Profile = () => {
     ownerDetails: {
       aadharNumber: '',
       panNumber: '',
-      businessName: '',
-      businessLicense: '',
+      vehicleRegistration: '',
+      insuranceNumber: '',
+      insuranceExpiry: '',
       bankDetails: {
         accountNumber: '',
         ifscCode: '',
@@ -79,8 +81,8 @@ const Profile = () => {
             expiryDate: userData.drivingLicense?.expiryDate ? new Date(userData.drivingLicense.expiryDate).toISOString().split('T')[0] : ''
           },
           ownerDetails: {
-            aadharNumber: userData.ownerDetails?.aadharNumber || '',
-            panNumber: userData.ownerDetails?.panNumber || '',
+            aadharNumber: userData.personalDetails?.aadharNumber || userData.ownerDetails?.aadharNumber || '',
+            panNumber: userData.personalDetails?.panNumber || userData.ownerDetails?.panNumber || '',
             vehicleRegistration: userData.ownerDetails?.vehicleRegistration || '',
             insuranceNumber: userData.ownerDetails?.insuranceNumber || '',
             insuranceExpiry: userData.ownerDetails?.insuranceExpiry ? new Date(userData.ownerDetails.insuranceExpiry).toISOString().split('T')[0] : '',
@@ -127,7 +129,9 @@ const Profile = () => {
     } else if (name === 'ownerDetails.bankDetails.accountNumber') {
       value = value.replace(/\D/g, '');
     } else if (name === 'ownerDetails.bankDetails.ifscCode') {
-      value = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11);
+      value = value.toUpperCase();
+    } else if (name === 'ownerDetails.bankDetails.accountHolderName') {
+      value = value.toUpperCase();
     } else if (name === 'drivingLicense.number') {
       value = value.toUpperCase();
     }
@@ -179,10 +183,10 @@ const Profile = () => {
       }
 
     } else if (name === 'ownerDetails.aadharNumber') {
-      if (!value.trim()) newErrors.aadharNumber = 'Required';
+      if (!value.trim()) newErrors.aadharNumber = 'Aadhar number is required';
       else if (!/^\d{12}$/.test(value)) newErrors.aadharNumber = 'Must be 12 digits';
     } else if (name === 'ownerDetails.panNumber') {
-      if (!value.trim()) newErrors.panNumber = 'Required';
+      if (!value.trim()) newErrors.panNumber = 'PAN number is required';
       else if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(value)) newErrors.panNumber = 'Format: ABCDE1234F';
     } else if (formData.role === 'owner') {
       if (name === 'ownerDetails.vehicleRegistration' && !value.trim()) {
@@ -191,9 +195,8 @@ const Profile = () => {
         newErrors.insuranceNumber = 'Required';
       } else if (name === 'ownerDetails.bankDetails.accountNumber' && !value.trim()) {
         newErrors.accountNumber = 'Required';
-      } else if (name === 'ownerDetails.bankDetails.ifscCode') {
-        if (!value.trim()) newErrors.ifscCode = 'Required';
-        else if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(value)) newErrors.ifscCode = 'Invalid IFSC format';
+      } else if (name === 'ownerDetails.bankDetails.ifscCode' && !value.trim()) {
+        newErrors.ifscCode = 'Required';
       } else if (name === 'ownerDetails.bankDetails.accountHolderName' && !value.trim()) {
         newErrors.accountHolderName = 'Required';
       }
@@ -286,19 +289,21 @@ const Profile = () => {
       newErrors.drivingLicense = 'Driving license number is required';
     }
     
+    // Aadhar and PAN validation for all users
+    if (!formData.ownerDetails.aadharNumber.trim()) {
+      newErrors.aadharNumber = 'Aadhar number is required';
+    } else if (!/^\d{12}$/.test(formData.ownerDetails.aadharNumber)) {
+      newErrors.aadharNumber = 'Must be exactly 12 digits';
+    }
+    
+    if (!formData.ownerDetails.panNumber.trim()) {
+      newErrors.panNumber = 'PAN number is required';
+    } else if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(formData.ownerDetails.panNumber)) {
+      newErrors.panNumber = 'Format: ABCDE1234F';
+    }
+    
     // Role-specific validation
     if (formData.role === 'owner') {
-      if (!formData.ownerDetails.aadharNumber.trim()) {
-        newErrors.aadharNumber = 'Aadhar number is required';
-      } else if (!/^\d{12}$/.test(formData.ownerDetails.aadharNumber)) {
-        newErrors.aadharNumber = 'Must be exactly 12 digits';
-      }
-      
-      if (!formData.ownerDetails.panNumber.trim()) {
-        newErrors.panNumber = 'PAN number is required';
-      } else if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(formData.ownerDetails.panNumber)) {
-        newErrors.panNumber = 'Format: ABCDE1234F';
-      }
       
       if (!formData.ownerDetails.vehicleRegistration.trim()) {
         newErrors.vehicleRegistration = 'Vehicle registration is required';
@@ -314,8 +319,6 @@ const Profile = () => {
       
       if (!formData.ownerDetails.bankDetails.ifscCode.trim()) {
         newErrors.ifscCode = 'IFSC code is required';
-      } else if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(formData.ownerDetails.bankDetails.ifscCode)) {
-        newErrors.ifscCode = 'Invalid IFSC format';
       }
       
       if (!formData.ownerDetails.bankDetails.accountHolderName.trim()) {
@@ -338,6 +341,7 @@ const Profile = () => {
     setLoading(true);
     
     try {
+      console.log('Submitting profile data:', formData);
       const updateData = {
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
@@ -357,11 +361,22 @@ const Profile = () => {
         }
       };
       
-      // Include owner details if role is owner
+      // Include personal details (Aadhar and PAN) for all users
+      updateData.personalDetails = {
+        aadharNumber: formData.ownerDetails.aadharNumber.trim(),
+        panNumber: formData.ownerDetails.panNumber.trim()
+      };
+      
+      // Also include in ownerDetails for backward compatibility
+      updateData.ownerDetails = {
+        aadharNumber: formData.ownerDetails.aadharNumber.trim(),
+        panNumber: formData.ownerDetails.panNumber.trim()
+      };
+      
+      // Include additional owner details if role is owner
       if (formData.role === 'owner') {
         updateData.ownerDetails = {
-          aadharNumber: formData.ownerDetails.aadharNumber.trim(),
-          panNumber: formData.ownerDetails.panNumber.trim(),
+          ...updateData.ownerDetails,
           vehicleRegistration: formData.ownerDetails.vehicleRegistration.trim(),
           insuranceNumber: formData.ownerDetails.insuranceNumber.trim(),
           insuranceExpiry: formData.ownerDetails.insuranceExpiry || null,
@@ -373,7 +388,8 @@ const Profile = () => {
         };
       }
       
-      const response = await secureAuthService.updateProfile(updateData);
+      // Use context updateProfile method for better state synchronization
+      const response = await updateUserProfile(updateData);
       
       if (response.success) {
         setIsEditing(false);
@@ -381,6 +397,12 @@ const Profile = () => {
         setRoleChangeWarning(false);
         setMissingFields([]);
         await fetchProfile();
+        
+        // Force navbar update
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('profile:updated', { detail: response.user }));
+          window.dispatchEvent(new CustomEvent('user:refreshed', { detail: response.user }));
+        }, 100);
         
         if (formData.role !== profileData?.role) {
           showToast.success(`Role changed to ${formData.role === 'owner' ? 'Owner' : 'Customer'}!`);
@@ -478,8 +500,8 @@ const Profile = () => {
           expiryDate: profileData.drivingLicense?.expiryDate ? new Date(profileData.drivingLicense.expiryDate).toISOString().split('T')[0] : ''
         },
         ownerDetails: {
-          aadharNumber: profileData.ownerDetails?.aadharNumber || '',
-          panNumber: profileData.ownerDetails?.panNumber || '',
+          aadharNumber: profileData.personalDetails?.aadharNumber || profileData.ownerDetails?.aadharNumber || '',
+          panNumber: profileData.personalDetails?.panNumber || profileData.ownerDetails?.panNumber || '',
           vehicleRegistration: profileData.ownerDetails?.vehicleRegistration || '',
           insuranceNumber: profileData.ownerDetails?.insuranceNumber || '',
           insuranceExpiry: profileData.ownerDetails?.insuranceExpiry ? new Date(profileData.ownerDetails.insuranceExpiry).toISOString().split('T')[0] : '',
@@ -620,409 +642,453 @@ const Profile = () => {
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                First Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="firstName"
-                value={formData.firstName}
-                onChange={handleInputChange}
-                disabled={!isEditing}
-                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
-                  errors.firstName ? 'border-red-500' : 'border-gray-300'
-                }`}
-              />
-              {errors.firstName && <p className="text-red-500 text-sm mt-1">{errors.firstName}</p>}
+          {/* Personal Details Section */}
+          <div className="mb-8">
+            <div className="flex items-center mb-6">
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
+                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900">Personal Details</h3>
             </div>
             
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Last Name
-              </label>
-              <input
-                type="text"
-                name="lastName"
-                value={formData.lastName}
-                onChange={handleInputChange}
-                disabled={!isEditing}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                disabled={true}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 cursor-not-allowed"
-              />
-              <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
-              {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Mobile Number <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={handleInputChange}
-                disabled={!isEditing}
-                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
-                  errors.phone ? 'border-red-500' : 'border-gray-300'
-                }`}
-              />
-              {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone}</p>}
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Date of Birth
-              </label>
-              <input
-                type="date"
-                name="dateOfBirth"
-                value={formData.dateOfBirth}
-                onChange={handleInputChange}
-                disabled={!isEditing}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Account Type <span className="text-red-500">*</span>
-              </label>
-              <div className="flex space-x-3">
-                <button
-                  type="button"
-                  onClick={() => isEditing && handleInputChange({ target: { name: 'role', value: 'customer' } })}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  First Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="firstName"
+                  value={formData.firstName}
+                  onChange={handleInputChange}
                   disabled={!isEditing}
-                  className={`flex-1 px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
-                    formData.role === 'customer'
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400'
-                  } ${!isEditing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                >
-                  Customer
-                </button>
-                <button
-                  type="button"
-                  onClick={() => isEditing && handleInputChange({ target: { name: 'role', value: 'owner' } })}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
+                    errors.firstName ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                />
+                {errors.firstName && <p className="text-red-500 text-sm mt-1">{errors.firstName}</p>}
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Last Name
+                </label>
+                <input
+                  type="text"
+                  name="lastName"
+                  value={formData.lastName}
+                  onChange={handleInputChange}
                   disabled={!isEditing}
-                  className={`flex-1 px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
-                    formData.role === 'owner'
-                      ? 'bg-purple-600 text-white border-purple-600'
-                      : 'bg-white text-gray-700 border-gray-300 hover:border-purple-400'
-                  } ${!isEditing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                >
-                  Vehicle Owner
-                </button>
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Email Address <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  disabled={true}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 cursor-not-allowed"
+                />
+                <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
+                {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Mobile Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleInputChange}
+                  disabled={!isEditing}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
+                    errors.phone ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                />
+                {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone}</p>}
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Date of Birth
+                </label>
+                <input
+                  type="date"
+                  name="dateOfBirth"
+                  value={formData.dateOfBirth}
+                  onChange={handleInputChange}
+                  disabled={!isEditing}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Account Type <span className="text-red-500">*</span>
+                </label>
+                <div className="flex space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => isEditing && handleInputChange({ target: { name: 'role', value: 'customer' } })}
+                    disabled={!isEditing}
+                    className={`flex-1 px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
+                      formData.role === 'customer'
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400'
+                    } ${!isEditing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                  >
+                    Customer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => isEditing && handleInputChange({ target: { name: 'role', value: 'owner' } })}
+                    disabled={!isEditing}
+                    className={`flex-1 px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
+                      formData.role === 'owner'
+                        ? 'bg-purple-600 text-white border-purple-600'
+                        : 'bg-white text-gray-700 border-gray-300 hover:border-purple-400'
+                    } ${!isEditing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                  >
+                    Vehicle Owner
+                  </button>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Aadhar Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="ownerDetails.aadharNumber"
+                  value={formData.ownerDetails.aadharNumber}
+                  onChange={handleInputChange}
+                  disabled={!isEditing}
+                  inputMode="numeric"
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
+                    errors.aadharNumber ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  placeholder="123456789012"
+                />
+                {errors.aadharNumber && <p className="text-red-500 text-sm mt-1">{errors.aadharNumber}</p>}
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  PAN Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="ownerDetails.panNumber"
+                  value={formData.ownerDetails.panNumber}
+                  onChange={handleInputChange}
+                  disabled={!isEditing}
+                  style={{ textTransform: 'uppercase' }}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
+                    errors.panNumber ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  placeholder="ABCDE1234F"
+                />
+                {errors.panNumber && <p className="text-red-500 text-sm mt-1">{errors.panNumber}</p>}
               </div>
             </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Driving License Number <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="drivingLicense.number"
-                value={formData.drivingLicense.number}
-                onChange={handleInputChange}
-                disabled={!isEditing}
-                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
-                  errors.drivingLicense ? 'border-red-500' : 'border-gray-300'
-                }`}
-                placeholder="MH1420110012345"
-              />
-              {errors.drivingLicense && <p className="text-red-500 text-sm mt-1">{errors.drivingLicense}</p>}
+          </div>
+          
+          {/* Driving License Section */}
+          <div className="mb-8">
+            <div className="flex items-center mb-6">
+              <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center mr-3">
+                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M6 6V5a3 3 0 013-3h2a3 3 0 013 3v1h2a2 2 0 012 2v3.57A22.952 22.952 0 0110 13a22.95 22.95 0 01-8-1.43V8a2 2 0 012-2h2zm2-1a1 1 0 011-1h2a1 1 0 011 1v1H8V5zm1 5a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
+                  <path d="M2 13.692V16a2 2 0 002 2h12a2 2 0 002-2v-2.308A24.974 24.974 0 0110 15c-2.796 0-5.487-.46-8-1.308z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900">Driving License</h3>
             </div>
             
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                License Expiry Date
-              </label>
-              <input
-                type="date"
-                name="drivingLicense.expiryDate"
-                value={formData.drivingLicense.expiryDate}
-                onChange={handleInputChange}
-                disabled={!isEditing}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  License Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  name="drivingLicense.number"
+                  value={formData.drivingLicense.number}
+                  onChange={handleInputChange}
+                  disabled={!isEditing}
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
+                    errors.drivingLicense ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  placeholder="MH1420110012345"
+                />
+                {errors.drivingLicense && <p className="text-red-500 text-sm mt-1">{errors.drivingLicense}</p>}
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Expiry Date
+                </label>
+                <input
+                  type="date"
+                  name="drivingLicense.expiryDate"
+                  value={formData.drivingLicense.expiryDate}
+                  onChange={handleInputChange}
+                  disabled={!isEditing}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
+                />
+              </div>
+            </div>
+          </div>
+          
+          {/* Address Section */}
+          <div className="mb-8">
+            <div className="flex items-center mb-6">
+              <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center mr-3">
+                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900">Address Information</h3>
             </div>
             
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Aadhar Number <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="ownerDetails.aadharNumber"
-                value={formData.ownerDetails.aadharNumber}
-                onChange={handleInputChange}
-                disabled={!isEditing}
-                inputMode="numeric"
-                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
-                  errors.aadharNumber ? 'border-red-500' : 'border-gray-300'
-                }`}
-                placeholder="123456789012"
-              />
-              {errors.aadharNumber && <p className="text-red-500 text-sm mt-1">{errors.aadharNumber}</p>}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Street Address
+                </label>
+                {isEditing ? (
+                  <LocationAutocomplete
+                    placeholder="Enter your complete address"
+                    onLocationSelect={(location) => {
+                      handleInputChange({ target: { name: 'address.street', value: location.address } });
+                    }}
+                  />
+                ) : (
+                  <textarea
+                    name="address.street"
+                    value={formData.address.street}
+                    onChange={handleInputChange}
+                    disabled={true}
+                    rows={3}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 resize-none"
+                    placeholder="Enter your complete address"
+                  />
+                )}
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  City
+                </label>
+                <input
+                  type="text"
+                  name="address.city"
+                  value={formData.address.city}
+                  onChange={handleInputChange}
+                  disabled={!isEditing}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
+                  placeholder="City"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  State
+                </label>
+                <input
+                  type="text"
+                  name="address.state"
+                  value={formData.address.state}
+                  onChange={handleInputChange}
+                  disabled={!isEditing}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
+                  placeholder="State"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  ZIP Code
+                </label>
+                <input
+                  type="text"
+                  name="address.zipCode"
+                  value={formData.address.zipCode}
+                  onChange={handleInputChange}
+                  disabled={!isEditing}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
+                  placeholder="ZIP Code"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Country
+                </label>
+                <input
+                  type="text"
+                  name="address.country"
+                  value={formData.address.country}
+                  onChange={handleInputChange}
+                  disabled={!isEditing}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
+                  placeholder="Country"
+                />
+              </div>
             </div>
+          </div>
             
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                PAN Number <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="ownerDetails.panNumber"
-                value={formData.ownerDetails.panNumber}
-                onChange={handleInputChange}
-                disabled={!isEditing}
-                style={{ textTransform: 'uppercase' }}
-                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
-                  errors.panNumber ? 'border-red-500' : 'border-gray-300'
-                }`}
-                placeholder="ABCDE1234F"
-              />
-              {errors.panNumber && <p className="text-red-500 text-sm mt-1">{errors.panNumber}</p>}
-            </div>
-            
-            <div className="md:col-span-2">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">Address Information</h3>
-            </div>
-            
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Street Address
-              </label>
-              <textarea
-                name="address.street"
-                value={formData.address.street}
-                onChange={handleInputChange}
-                disabled={!isEditing}
-                rows={3}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 resize-none"
-                placeholder="Enter your complete address"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                City
-              </label>
-              <input
-                type="text"
-                name="address.city"
-                value={formData.address.city}
-                onChange={handleInputChange}
-                disabled={!isEditing}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
-                placeholder="City"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                State
-              </label>
-              <input
-                type="text"
-                name="address.state"
-                value={formData.address.state}
-                onChange={handleInputChange}
-                disabled={!isEditing}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
-                placeholder="State"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                ZIP Code
-              </label>
-              <input
-                type="text"
-                name="address.zipCode"
-                value={formData.address.zipCode}
-                onChange={handleInputChange}
-                disabled={!isEditing}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
-                placeholder="ZIP Code"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Country
-              </label>
-              <input
-                type="text"
-                name="address.country"
-                value={formData.address.country}
-                onChange={handleInputChange}
-                disabled={!isEditing}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
-                placeholder="Country"
-              />
-            </div>
-            
-            {/* Owner-specific fields */}
-            {formData.role === 'owner' && (
-              <>
-                <div className="md:col-span-2">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">Vehicle Owner Information</h3>
-                </div>
-                
-
-                
-
-                
-                {/* Vehicle Information */}
-                <div className="md:col-span-2">
-                  <h4 className="text-md font-semibold text-gray-800 mb-3 flex items-center">
-                    <svg className="w-4 h-4 mr-2 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+          {/* Owner-specific fields */}
+          {formData.role === 'owner' && (
+            <>
+              {/* Vehicle Information Section */}
+              <div className="mb-8">
+                <div className="flex items-center mb-6">
+                  <div className="w-8 h-8 bg-orange-600 rounded-lg flex items-center justify-center mr-3">
+                    <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
                       <path d="M3 4a1 1 0 00-1 1v10a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H10a1 1 0 001-1V5a1 1 0 00-1-1H3zM14 7a1 1 0 00-1 1v8a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H21a1 1 0 001-1V8a1 1 0 00-1-1h-7z" />
                     </svg>
-                    Vehicle Information
-                  </h4>
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900">Vehicle Information</h3>
                 </div>
                 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Vehicle Registration Number <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="ownerDetails.vehicleRegistration"
-                    value={formData.ownerDetails.vehicleRegistration}
-                    onChange={handleInputChange}
-                    disabled={!isEditing}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
-                      errors.vehicleRegistration ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="MH12AB1234"
-                  />
-                  {errors.vehicleRegistration && <p className="text-red-500 text-xs mt-1">{errors.vehicleRegistration}</p>}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Vehicle Registration Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="ownerDetails.vehicleRegistration"
+                      value={formData.ownerDetails.vehicleRegistration}
+                      onChange={handleInputChange}
+                      disabled={!isEditing}
+                      className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
+                        errors.vehicleRegistration ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="MH12AB1234"
+                    />
+                    {errors.vehicleRegistration && <p className="text-red-500 text-sm mt-1">{errors.vehicleRegistration}</p>}
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Insurance Policy Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="ownerDetails.insuranceNumber"
+                      value={formData.ownerDetails.insuranceNumber}
+                      onChange={handleInputChange}
+                      disabled={!isEditing}
+                      className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
+                        errors.insuranceNumber ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="Insurance policy number"
+                    />
+                    {errors.insuranceNumber && <p className="text-red-500 text-sm mt-1">{errors.insuranceNumber}</p>}
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Insurance Expiry Date
+                    </label>
+                    <input
+                      type="date"
+                      name="ownerDetails.insuranceExpiry"
+                      value={formData.ownerDetails.insuranceExpiry}
+                      onChange={handleInputChange}
+                      disabled={!isEditing}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
+                    />
+                  </div>
                 </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Insurance Policy Number <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="ownerDetails.insuranceNumber"
-                    value={formData.ownerDetails.insuranceNumber}
-                    onChange={handleInputChange}
-                    disabled={!isEditing}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
-                      errors.insuranceNumber ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="Insurance policy number"
-                  />
-                  {errors.insuranceNumber && <p className="text-red-500 text-xs mt-1">{errors.insuranceNumber}</p>}
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Insurance Expiry Date
-                  </label>
-                  <input
-                    type="date"
-                    name="ownerDetails.insuranceExpiry"
-                    value={formData.ownerDetails.insuranceExpiry}
-                    onChange={handleInputChange}
-                    disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
-                  />
-                </div>
-                
-
-                
-                {/* Banking Information */}
-                <div className="md:col-span-2">
-                  <h4 className="text-md font-semibold text-gray-800 mb-3 flex items-center">
-                    <svg className="w-4 h-4 mr-2 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+              </div>
+              
+              {/* Banking Information Section */}
+              <div className="mb-8">
+                <div className="flex items-center mb-6">
+                  <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center mr-3">
+                    <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" />
                       <path fillRule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clipRule="evenodd" />
                     </svg>
-                    Banking Information
-                  </h4>
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900">Banking Information</h3>
                 </div>
                 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Account Number <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="ownerDetails.bankDetails.accountNumber"
-                    value={formData.ownerDetails.bankDetails.accountNumber}
-                    onChange={handleInputChange}
-                    disabled={!isEditing}
-                    inputMode="numeric"
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
-                      errors.accountNumber ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="1234567890123456"
-                  />
-                  {errors.accountNumber && <p className="text-red-500 text-xs mt-1">{errors.accountNumber}</p>}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Account Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="ownerDetails.bankDetails.accountNumber"
+                      value={formData.ownerDetails.bankDetails.accountNumber}
+                      onChange={handleInputChange}
+                      disabled={!isEditing}
+                      inputMode="numeric"
+                      className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
+                        errors.accountNumber ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="1234567890123456"
+                    />
+                    {errors.accountNumber && <p className="text-red-500 text-sm mt-1">{errors.accountNumber}</p>}
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      IFSC Code <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="ownerDetails.bankDetails.ifscCode"
+                      value={formData.ownerDetails.bankDetails.ifscCode}
+                      onChange={handleInputChange}
+                      disabled={!isEditing}
+                      style={{ textTransform: 'uppercase' }}
+                      className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
+                        errors.ifscCode ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="SBIN0001234"
+                    />
+                    {errors.ifscCode && <p className="text-red-500 text-sm mt-1">{errors.ifscCode}</p>}
+                  </div>
+                  
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Account Holder Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="ownerDetails.bankDetails.accountHolderName"
+                      value={formData.ownerDetails.bankDetails.accountHolderName}
+                      onChange={handleInputChange}
+                      disabled={!isEditing}
+                      className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
+                        errors.accountHolderName ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="Account holder name"
+                    />
+                    {errors.accountHolderName && <p className="text-red-500 text-sm mt-1">{errors.accountHolderName}</p>}
+                  </div>
                 </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    IFSC Code <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="ownerDetails.bankDetails.ifscCode"
-                    value={formData.ownerDetails.bankDetails.ifscCode}
-                    onChange={handleInputChange}
-                    disabled={!isEditing}
-                    style={{ textTransform: 'uppercase' }}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
-                      errors.ifscCode ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="SBIN0001234"
-                  />
-                  {errors.ifscCode && <p className="text-red-500 text-xs mt-1">{errors.ifscCode}</p>}
-                </div>
-                
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Account Holder Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="ownerDetails.bankDetails.accountHolderName"
-                    value={formData.ownerDetails.bankDetails.accountHolderName}
-                    onChange={handleInputChange}
-                    disabled={!isEditing}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
-                      errors.accountHolderName ? 'border-red-500' : 'border-gray-300'
-                    }`}
-                    placeholder="Account holder name"
-                  />
-                  {errors.accountHolderName && <p className="text-red-500 text-xs mt-1">{errors.accountHolderName}</p>}
-                </div>
-              </>
-            )}
-          </div>
+              </div>
+            </>
+          )}
           
           {isEditing && (
             <div className="mt-8 pt-6 border-t">
@@ -1224,8 +1290,6 @@ const Profile = () => {
             </div>
           </div>
         )}
-        
-
       </div>
     </div>
   );

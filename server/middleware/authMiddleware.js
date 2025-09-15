@@ -4,8 +4,12 @@ const User = require('../models/User');
 // Middleware to authenticate JWT token
 const authenticateToken = async (req, res, next) => {
   try {
+    // Check for token in Authorization header (Bearer token) or HTTP-only cookie
     const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    const bearerToken = authHeader && authHeader.split(' ')[1];
+    const cookieToken = req.cookies?.authToken;
+    
+    const token = bearerToken || cookieToken;
 
     if (!token) {
       return res.status(401).json({

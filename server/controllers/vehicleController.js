@@ -14,7 +14,7 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
   return R * c; // Distance in kilometers
 };
 
-// Get all vehicles (public route)
+// Get all vehicles (public route - no authentication required)
 const getVehicles = async (req, res) => {
   try {
     const {
@@ -27,15 +27,18 @@ const getVehicles = async (req, res) => {
       availability = 'available',
       sortBy = 'price',
       page = 1,
-      limit = 10
+      limit = 20
     } = req.query;
 
-    // Build query - only show verified and active vehicles
+    // Build query - show all active vehicles (remove verification requirement for now)
     let query = {
-      'verification.isVerified': true, // Only verified vehicles
-      isActive: true,                  // Only active vehicles
-      'availability.isAvailable': true // Only available vehicles
+      isActive: { $ne: false }  // Show all vehicles that are not explicitly inactive
     };
+    
+    // Only filter by availability if specified
+    if (availability === 'available') {
+      query['availability.isAvailable'] = true;
+    }
 
     // Vehicle type filter
     if (vehicleType) {
@@ -138,7 +141,7 @@ const getVehicles = async (req, res) => {
   }
 };
 
-// Get vehicle by ID
+// Get vehicle by ID (public route - no authentication required)
 const getVehicleById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -151,6 +154,14 @@ const getVehicleById = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Vehicle not found'
+      });
+    }
+
+    // Don't show inactive vehicles to public
+    if (vehicle.isActive === false) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vehicle not available'
       });
     }
 
@@ -171,29 +182,115 @@ const getVehicleById = async (req, res) => {
 // Create new vehicle (for owners)
 const createVehicle = async (req, res) => {
   try {
+    // Handle both JSON and FormData
+    const isFormData = req.headers['content-type']?.includes('multipart/form-data');
+    
+    let name, brand, model, type, year, fuelType, transmission, seatingCapacity;
+    let pricing, location, features, description, availability;
+    
+    if (isFormData) {
+      // Parse FormData fields
+      name = req.body.name;
+      brand = req.body.brand;
+      model = req.body.model;
+      type = req.body.type;
+      year = req.body.year;
+      fuelType = req.body.fuelType;
+      transmission = req.body.transmission;
+      seatingCapacity = req.body.seatingCapacity;
+      location = req.body.location;
+      description = req.body.description;
+      availability = req.body.availability !== 'false';
+      
+      // Parse pricing from FormData
+      pricing = {
+        hourlyRate: req.body['pricing[hourlyRate]'],
+        dailyRate: req.body['pricing[dailyRate]']
+      };
+      
+      // Parse features array
+      features = req.body['features[]'] ? 
+        (Array.isArray(req.body['features[]']) ? req.body['features[]'] : [req.body['features[]']]) : [];
+    } else {
+      // Parse JSON data
+      ({ name, brand, model, type, year, fuelType, transmission, seatingCapacity,
+         pricing, location, features, description, availability } = req.body);
+    }
+
+    // Parse location to extract city and coordinates
+    const locationData = {
+      address: location,
+      city: location.split(',').pop()?.trim() || 'Unknown',
+      state: 'India',
+      coordinates: { latitude: 19.0760, longitude: 72.8777 } // Default to Mumbai
+    };
+
+    // Process uploaded files
+    const images = req.files?.images || [];
+    const documents = {};
+    
+    // Process document files
+    if (req.files) {
+      ['registration', 'insurance', 'permit', 'puc'].forEach(docType => {
+        const docField = `documents[${docType}]`;
+        if (req.files[docField] && req.files[docField][0]) {
+          documents[docType] = {
+            url: `/uploads/documents/${req.files[docField][0].filename}`,
+            originalName: req.files[docField][0].originalname,
+            uploadedAt: new Date()
+          };
+        }
+      });
+    }
+
     const vehicleData = {
-      ...req.body,
-      owner: req.user.id
+      name: name || `${brand} ${model}`,
+      brand,
+      model,
+      type: type.toLowerCase(),
+      year: parseInt(year),
+      fuelType: fuelType.toLowerCase(),
+      transmission,
+      seatingCapacity: parseInt(seatingCapacity),
+      pricing: {
+        hourlyRate: parseInt(pricing.hourlyRate),
+        dailyRate: parseInt(pricing.dailyRate),
+        securityDeposit: parseInt(pricing.dailyRate) * 0.5 // 50% of daily rate
+      },
+      location: locationData,
+      features: features || [],
+      description: description || '',
+      availability: { isAvailable: availability !== false },
+      isActive: true,
+      owner: req.user.userId || req.user.id,
+      images: images.length > 0 
+        ? images.map(file => ({
+            url: `/uploads/vehicles/${file.filename}`,
+            alt: `${brand} ${model}`
+          }))
+        : [{ url: '/api/placeholder/400/300', alt: `${brand} ${model}` }],
+      documents,
+      rating: { average: 0, count: 0 }
     };
 
     const vehicle = new Vehicle(vehicleData);
     await vehicle.save();
 
     // Update user's vehicle count
-    await User.findByIdAndUpdate(req.user.id, {
+    await User.findByIdAndUpdate(req.user.userId || req.user.id, {
       $inc: { totalVehicles: 1 }
     });
 
     res.status(201).json({
       success: true,
-      message: 'Vehicle created successfully',
+      message: 'Vehicle added successfully! Documents uploaded and vehicle is now visible to all users.',
       data: vehicle
     });
   } catch (error) {
     console.error('Error creating vehicle:', error);
     res.status(400).json({
       success: false,
-      message: 'Error creating vehicle',
+      message: 'Error creating vehicle: ' + error.message,
       error: error.message
     });
   }
@@ -330,7 +427,7 @@ const addMockData = async (req, res) => {
       if (!existingUser) {
         const newUser = new User({
           ...owner,
-          password: 'password123',
+          password: process.env.DEFAULT_OWNER_PASSWORD || 'temp_password_change_me',
           role: 'owner'
         });
         await newUser.save();

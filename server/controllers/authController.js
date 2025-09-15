@@ -243,7 +243,7 @@ const register = asyncHandler(async (req, res) => {
 
   // Clean up OTP data
   if (global.otpStore?.[phone]) {
-    delete global.otpStore[phone];
+    global.otpStore[phone] = undefined;
   }
 
   // Generate token

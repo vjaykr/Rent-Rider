@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import GoogleMapsService from '../../services/googleMapsService';
 import LocationAutocomplete from '../../components/LocationAutocomplete';
-import toast from 'react-hot-toast';
+import { vehicleService } from '../../services/vehicleService';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -14,6 +13,8 @@ const Home = () => {
   const [watchId, setWatchId] = useState(null);
   const [locationAccuracy, setLocationAccuracy] = useState(null);
   const [locationPermission, setLocationPermission] = useState('unknown');
+  const [featuredVehicles, setFeaturedVehicles] = useState([]);
+  const [loadingVehicles, setLoadingVehicles] = useState(true);
   
   // Google Places API
   const autocompleteRef = useRef(null);
@@ -249,6 +250,64 @@ const Home = () => {
     }
   };
 
+  // Load featured vehicles
+  useEffect(() => {
+    const loadFeaturedVehicles = async () => {
+      try {
+        setLoadingVehicles(true);
+        const result = await vehicleService.getVehicles({ limit: 6, sortBy: 'rating' });
+        
+        if (result.success) {
+          setFeaturedVehicles(result.data.vehicles || []);
+        } else if (result.fallbackData) {
+          setFeaturedVehicles(result.fallbackData.vehicles.slice(0, 6));
+        }
+      } catch (error) {
+        console.error('Error loading featured vehicles:', error);
+        // Use fallback data
+        setFeaturedVehicles([
+          {
+            _id: 'featured-1',
+            brand: 'Royal Enfield',
+            model: 'Classic 350',
+            type: 'motorcycle',
+            pricing: { hourlyRate: 100, dailyRate: 800 },
+            location: { city: 'Mumbai', address: 'Bandra West' },
+            rating: { average: 4.8 },
+            images: [{ url: '/api/placeholder/300/200' }],
+            availability: { isAvailable: true }
+          },
+          {
+            _id: 'featured-2',
+            brand: 'Honda',
+            model: 'Activa 6G',
+            type: 'scooter',
+            pricing: { hourlyRate: 60, dailyRate: 400 },
+            location: { city: 'Mumbai', address: 'Andheri East' },
+            rating: { average: 4.6 },
+            images: [{ url: '/api/placeholder/300/200' }],
+            availability: { isAvailable: true }
+          },
+          {
+            _id: 'featured-3',
+            brand: 'Bajaj',
+            model: 'Pulsar NS200',
+            type: 'motorcycle',
+            pricing: { hourlyRate: 80, dailyRate: 600 },
+            location: { city: 'Bangalore', address: 'Koramangala' },
+            rating: { average: 4.5 },
+            images: [{ url: '/api/placeholder/300/200' }],
+            availability: { isAvailable: true }
+          }
+        ]);
+      } finally {
+        setLoadingVehicles(false);
+      }
+    };
+
+    loadFeaturedVehicles();
+  }, []);
+
   // Cleanup on component unmount
   React.useEffect(() => {
     return () => {
@@ -403,16 +462,34 @@ const Home = () => {
                         // Trigger a search for the city to get coordinates
                         const searchCity = async () => {
                           try {
-                            const response = await fetch(
-                              `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(city)}&apiKey=c829ceacd98e40868eee125bfbca6624`
-                            );
-                            const data = await response.json();
-                            if (data.features && data.features.length > 0) {
-                              const coords = data.features[0].geometry.coordinates;
-                              setCurrentPosition({
-                                latitude: coords[1],
-                                longitude: coords[0]
-                              });
+                            const apiKey = process.env.REACT_APP_GEOAPIFY_API_KEY;
+                            
+                            if (apiKey && apiKey.trim() && apiKey !== 'your_geoapify_api_key_here') {
+                              // Use Geoapify API
+                              const response = await fetch(
+                                `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(city)}&bias=countrycode:in&apiKey=${apiKey}`
+                              );
+                              const data = await response.json();
+                              if (data.features && data.features.length > 0) {
+                                const coords = data.features[0].geometry.coordinates;
+                                setCurrentPosition({
+                                  latitude: coords[1],
+                                  longitude: coords[0]
+                                });
+                              }
+                            } else {
+                              // Fallback to Nominatim
+                              const response = await fetch(
+                                `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=in&q=${encodeURIComponent(city)}`,
+                                { headers: { 'User-Agent': 'RentRider-App' } }
+                              );
+                              const data = await response.json();
+                              if (data && data.length > 0) {
+                                setCurrentPosition({
+                                  latitude: parseFloat(data[0].lat),
+                                  longitude: parseFloat(data[0].lon)
+                                });
+                              }
                             }
                           } catch (error) {
                             console.error('Error geocoding city:', error);
@@ -546,6 +623,92 @@ const Home = () => {
               <h3 className="text-xl font-semibold mb-2">Best Prices</h3>
               <p className="text-gray-600">Competitive rates with flexible pricing options - hourly, daily, or monthly.</p>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Featured Vehicles Section */}
+      <div className="py-16 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">
+              Featured Bikes
+            </h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Discover popular bikes available for rent in your city
+            </p>
+          </div>
+          
+          {loadingVehicles ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="bg-gray-200 rounded-lg h-64 animate-pulse"></div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {featuredVehicles.map((vehicle) => (
+                <div key={vehicle._id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+                  <div className="relative">
+                    <img
+                      src={vehicle.images?.[0]?.url || '/api/placeholder/300/200'}
+                      alt={`${vehicle.brand} ${vehicle.model}`}
+                      className="w-full h-48 object-cover"
+                    />
+                    <div className="absolute top-2 right-2 bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
+                      Available
+                    </div>
+                  </div>
+                  
+                  <div className="p-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        {vehicle.brand} {vehicle.model}
+                      </h3>
+                      <div className="flex items-center">
+                        <svg className="w-4 h-4 text-yellow-400 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                        <span className="text-sm text-gray-600">
+                          {vehicle.rating?.average?.toFixed(1) || '4.5'}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <p className="text-sm text-gray-600 mb-3 capitalize">
+                      {vehicle.type} • {vehicle.location.city}
+                    </p>
+                    
+                    <div className="flex justify-between items-center mb-4">
+                      <div>
+                        <p className="text-lg font-bold text-gray-900">
+                          ₹{vehicle.pricing.hourlyRate}/hour
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          ₹{vehicle.pricing.dailyRate}/day
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <Link
+                      to={`/vehicles/${vehicle._id}`}
+                      className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors text-center font-medium block"
+                    >
+                      View Details
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          <div className="text-center mt-8">
+            <Link
+              to="/vehicles"
+              className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors inline-block"
+            >
+              View All Bikes
+            </Link>
           </div>
         </div>
       </div>

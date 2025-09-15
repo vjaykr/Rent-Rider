@@ -8,7 +8,41 @@ const LocationAutocomplete = ({ onLocationSelect, placeholder = "Enter location.
   const inputRef = useRef(null);
   const debounceRef = useRef(null);
 
-  const API_KEY = 'c829ceacd98e40868eee125bfbca6624';
+  const API_KEY = process.env.REACT_APP_GEOAPIFY_API_KEY;
+
+  // Fallback locations for India
+  const fallbackLocations = [
+    'Mumbai, Maharashtra',
+    'Delhi, Delhi',
+    'Bangalore, Karnataka',
+    'Pune, Maharashtra',
+    'Chennai, Tamil Nadu',
+    'Hyderabad, Telangana',
+    'Kolkata, West Bengal',
+    'Ahmedabad, Gujarat',
+    'Surat, Gujarat',
+    'Jaipur, Rajasthan',
+    'Lucknow, Uttar Pradesh',
+    'Kanpur, Uttar Pradesh',
+    'Nagpur, Maharashtra',
+    'Indore, Madhya Pradesh',
+    'Thane, Maharashtra',
+    'Bhopal, Madhya Pradesh',
+    'Visakhapatnam, Andhra Pradesh',
+    'Pimpri-Chinchwad, Maharashtra',
+    'Patna, Bihar',
+    'Vadodara, Gujarat',
+    'Ghaziabad, Uttar Pradesh',
+    'Ludhiana, Punjab',
+    'Agra, Uttar Pradesh',
+    'Nashik, Maharashtra',
+    'Faridabad, Haryana',
+    'Meerut, Uttar Pradesh',
+    'Rajkot, Gujarat',
+    'Kalyan-Dombivali, Maharashtra',
+    'Vasai-Virar, Maharashtra',
+    'Varanasi, Uttar Pradesh'
+  ];
 
   const searchPlaces = async (searchQuery) => {
     if (!searchQuery.trim() || searchQuery.length < 2) {
@@ -19,20 +53,66 @@ const LocationAutocomplete = ({ onLocationSelect, placeholder = "Enter location.
     setIsLoading(true);
     
     try {
-      const url = `https://api.geoapify.com/v1/geocode/autocomplete?text=${encodeURIComponent(searchQuery)}&apiKey=${API_KEY}`;
-      
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      // Use Geoapify API if key is available
+      if (API_KEY && API_KEY.trim() && API_KEY !== 'your_geoapify_api_key_here') {
+        const url = `https://api.geoapify.com/v1/geocode/autocomplete?text=${encodeURIComponent(searchQuery)}&bias=countrycode:in&apiKey=${API_KEY}`;
+        
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          throw new Error(`Geoapify API error: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        setSuggestions(data.features || []);
+      } else {
+        // Fallback to Nominatim if no Geoapify key
+        const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=10&countrycodes=in&q=${encodeURIComponent(searchQuery)}`;
+        
+        const response = await fetch(url, {
+          headers: { 'User-Agent': 'RentRider-App' }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Nominatim API error: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        const formattedSuggestions = data.map((item, index) => ({
+          properties: {
+            formatted: item.display_name,
+            place_id: item.place_id || `nominatim_${index}`
+          },
+          geometry: {
+            coordinates: [parseFloat(item.lon), parseFloat(item.lat)]
+          }
+        }));
+        
+        setSuggestions(formattedSuggestions);
       }
       
-      const data = await response.json();
-      setSuggestions(data.features || []);
       setShowSuggestions(true);
     } catch (error) {
       console.error('Error fetching places:', error);
-      setSuggestions([]);
+      // Fallback to local filtering on any error
+      const filtered = fallbackLocations
+        .filter(location => 
+          location.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+        .slice(0, 10)
+        .map((location, index) => ({
+          properties: {
+            formatted: location,
+            place_id: `fallback_${index}`
+          },
+          geometry: {
+            coordinates: [0, 0]
+          }
+        }));
+      
+      setSuggestions(filtered);
+      setShowSuggestions(true);
     } finally {
       setIsLoading(false);
     }

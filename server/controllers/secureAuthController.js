@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const Joi = require('joi');
 const { verifyIdToken } = require('../config/firebase');
 const winston = require('winston');
+const bcrypt = require('bcryptjs');
 
 // Logger setup
 const logger = winston.createLogger({
@@ -73,6 +74,7 @@ const createUserResponse = (user) => ({
     dateOfBirth: user.dateOfBirth,
     address: user.address,
     drivingLicense: user.drivingLicense,
+    personalDetails: user.personalDetails,
     ownerDetails: user.ownerDetails,
     isProfileComplete: user.isProfileComplete,
     hasPassword: user.hasPassword,
@@ -409,6 +411,10 @@ const updateProfile = async (req, res) => {
         number: Joi.string().allow('').optional(),
         expiryDate: Joi.date().optional()
       }).optional(),
+      personalDetails: Joi.object({
+        aadharNumber: Joi.string().pattern(/^\d{12}$/).allow('').optional(),
+        panNumber: Joi.string().pattern(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/).allow('').optional()
+      }).optional(),
       ownerDetails: Joi.object({
         aadharNumber: Joi.string().pattern(/^\d{12}$/).allow('').optional(),
         panNumber: Joi.string().pattern(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/).allow('').optional(),
@@ -417,7 +423,7 @@ const updateProfile = async (req, res) => {
         insuranceExpiry: Joi.date().allow(null).optional(),
         bankDetails: Joi.object({
           accountNumber: Joi.string().allow('').optional(),
-          ifscCode: Joi.string().pattern(/^[A-Z]{4}0[A-Z0-9]{6}$/).allow('').optional(),
+          ifscCode: Joi.string().allow('').optional(),
           accountHolderName: Joi.string().allow('').optional()
         }).optional()
       }).optional()
@@ -452,55 +458,68 @@ const updateProfile = async (req, res) => {
       updateObj.fullName = `${firstName} ${lastName}`;
     }
     
-    // Handle role change and owner details validation
-    if (value.role === 'owner' && value.ownerDetails) {
-      const { ownerDetails } = value;
+    // Handle personalDetails (Aadhar/PAN for all users)
+    if (value.personalDetails) {
+      const { personalDetails } = value;
       
-      // Validate required fields for owners
-      const requiredFields = ['aadharNumber', 'panNumber', 'vehicleRegistration', 'insuranceNumber'];
-      const bankFields = ['accountNumber', 'ifscCode', 'accountHolderName'];
-      
-      for (const field of requiredFields) {
-        if (!ownerDetails[field] || !ownerDetails[field].trim()) {
-          return res.status(400).json({
-            success: false,
-            message: `${field.replace(/([A-Z])/g, ' $1').toLowerCase()} is required for owners`
-          });
-        }
-      }
-      
-      if (ownerDetails.bankDetails) {
-        for (const field of bankFields) {
-          if (!ownerDetails.bankDetails[field] || !ownerDetails.bankDetails[field].trim()) {
-            return res.status(400).json({
-              success: false,
-              message: `${field.replace(/([A-Z])/g, ' $1').toLowerCase()} is required for owners`
-            });
-          }
-        }
-      }
-      
-      // Format validation
-      if (!/^\d{12}$/.test(ownerDetails.aadharNumber)) {
+      if (personalDetails.aadharNumber && !/^\d{12}$/.test(personalDetails.aadharNumber)) {
         return res.status(400).json({
           success: false,
           message: 'Aadhar number must be exactly 12 digits'
         });
       }
       
-      if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(ownerDetails.panNumber)) {
+      if (personalDetails.panNumber && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(personalDetails.panNumber)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid PAN number format (ABCDE1234F)'
+        });
+      }
+    }
+    
+    // Handle ownerDetails (backward compatibility + owner-specific fields)
+    if (value.ownerDetails) {
+      const { ownerDetails } = value;
+      
+      // Aadhar and PAN validation for backward compatibility
+      if (ownerDetails.aadharNumber && !/^\d{12}$/.test(ownerDetails.aadharNumber)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Aadhar number must be exactly 12 digits'
+        });
+      }
+      
+      if (ownerDetails.panNumber && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(ownerDetails.panNumber)) {
         return res.status(400).json({
           success: false,
           message: 'Invalid PAN number format (ABCDE1234F)'
         });
       }
       
-      if (ownerDetails.bankDetails && ownerDetails.bankDetails.ifscCode && 
-          !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ownerDetails.bankDetails.ifscCode)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid IFSC code format'
-        });
+      // Additional validation for owners
+      if (value.role === 'owner') {
+        const requiredFields = ['vehicleRegistration', 'insuranceNumber'];
+        const bankFields = ['accountNumber', 'ifscCode', 'accountHolderName'];
+        
+        for (const field of requiredFields) {
+          if (!ownerDetails[field] || !ownerDetails[field].trim()) {
+            return res.status(400).json({
+              success: false,
+              message: `${field.replace(/([A-Z])/g, ' $1').toLowerCase()} is required for owners`
+            });
+          }
+        }
+        
+        if (ownerDetails.bankDetails) {
+          for (const field of bankFields) {
+            if (!ownerDetails.bankDetails[field] || !ownerDetails.bankDetails[field].trim()) {
+              return res.status(400).json({
+                success: false,
+                message: `${field.replace(/([A-Z])/g, ' $1').toLowerCase()} is required for owners`
+              });
+            }
+          }
+        }
       }
     }
     
@@ -515,16 +534,39 @@ const updateProfile = async (req, res) => {
     
     // Update user fields
     Object.keys(updateObj).forEach(key => {
-      if (key === 'ownerDetails' && updateObj[key]) {
+      if (key === 'personalDetails' && updateObj[key]) {
+        // Handle personalDetails updates
+        if (!user.personalDetails) {
+          user.personalDetails = {};
+        }
+        
+        const currentPersonalDetails = user.personalDetails.toObject ? user.personalDetails.toObject() : (user.personalDetails || {});
+        const newPersonalDetails = updateObj[key];
+        
+        user.personalDetails = {
+          ...currentPersonalDetails,
+          ...newPersonalDetails
+        };
+        
+        user.markModified('personalDetails');
+        
+        logger.info('Updating personalDetails', { 
+          userId, 
+          currentPersonalDetails, 
+          newPersonalDetails, 
+          finalPersonalDetails: user.personalDetails 
+        });
+      } else if (key === 'ownerDetails' && updateObj[key]) {
         // Initialize ownerDetails if it doesn't exist
         if (!user.ownerDetails) {
           user.ownerDetails = {};
         }
         
-        // Merge ownerDetails properly
-        const currentOwnerDetails = user.ownerDetails.toObject ? user.ownerDetails.toObject() : user.ownerDetails;
+        // Get current ownerDetails safely
+        const currentOwnerDetails = user.ownerDetails.toObject ? user.ownerDetails.toObject() : (user.ownerDetails || {});
         const newOwnerDetails = updateObj[key];
         
+        // Merge ownerDetails properly
         user.ownerDetails = {
           ...currentOwnerDetails,
           ...newOwnerDetails
@@ -541,6 +583,30 @@ const updateProfile = async (req, res) => {
         
         // Mark as modified for mongoose
         user.markModified('ownerDetails');
+        
+        // Also update personalDetails for backward compatibility if Aadhar/PAN provided in ownerDetails
+        if (newOwnerDetails.aadharNumber || newOwnerDetails.panNumber) {
+          if (!user.personalDetails) {
+            user.personalDetails = {};
+          }
+          
+          if (newOwnerDetails.aadharNumber) {
+            user.personalDetails.aadharNumber = newOwnerDetails.aadharNumber;
+          }
+          if (newOwnerDetails.panNumber) {
+            user.personalDetails.panNumber = newOwnerDetails.panNumber;
+          }
+          
+          user.markModified('personalDetails');
+        }
+        
+        // Log the update for debugging
+        logger.info('Updating ownerDetails', { 
+          userId, 
+          currentOwnerDetails, 
+          newOwnerDetails, 
+          finalOwnerDetails: user.ownerDetails 
+        });
       } else if (key === 'address' && updateObj[key]) {
         // Handle address updates
         const currentAddress = user.address?.toObject ? user.address.toObject() : user.address || {};

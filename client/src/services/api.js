@@ -39,12 +39,6 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    // Handle 401 (Unauthorized) responses
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      window.location.href = '/login';
-    }
-    
     // Log error for debugging
     console.error('API Error:', {
       url: error.config?.url,
@@ -52,6 +46,13 @@ api.interceptors.response.use(
       status: error.response?.status,
       data: error.response?.data
     });
+    
+    // Only auto-logout on 401 for auth-related endpoints, not owner routes
+    if (error.response?.status === 401 && 
+        error.config?.url?.includes('/auth/') && 
+        !error.config?.url?.includes('/owner/')) {
+      window.dispatchEvent(new CustomEvent('auth:logout'));
+    }
     
     return Promise.reject(error);
   }

@@ -25,10 +25,8 @@ const api = axios.create({
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Clear any client-side auth state
-      window.dispatchEvent(new CustomEvent('auth:logout'));
-    }
+    // Log error but don't auto-logout
+    console.error('SecureAuth API Error:', error.response?.status, error.response?.data);
     return Promise.reject(error);
   }
 );
@@ -38,9 +36,29 @@ export const secureAuthService = {
   async googleSignup(idToken) {
     try {
       const response = await api.post('/auth/google-signup', { idToken });
+      // Extract token from Set-Cookie header if available
+      this.extractAndStoreToken(response);
       return response.data;
     } catch (error) {
       throw error.response?.data || { success: false, message: 'Network error' };
+    }
+  },
+
+  // Extract token from response and store in localStorage
+  extractAndStoreToken(response) {
+    try {
+      const setCookieHeader = response.headers['set-cookie'];
+      if (setCookieHeader) {
+        const authCookie = setCookieHeader.find(cookie => cookie.startsWith('authToken='));
+        if (authCookie) {
+          const token = authCookie.split('authToken=')[1].split(';')[0];
+          if (token) {
+            localStorage.setItem('token', token);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error extracting token:', error);
     }
   },
 
@@ -48,6 +66,7 @@ export const secureAuthService = {
   async completeProfile(profileData) {
     try {
       const response = await api.post('/auth/complete-profile', profileData);
+      this.extractAndStoreToken(response);
       return response.data;
     } catch (error) {
       throw error.response?.data || { success: false, message: 'Network error' };
@@ -58,6 +77,7 @@ export const secureAuthService = {
   async emailLogin(email, password) {
     try {
       const response = await api.post('/auth/email-login', { email, password });
+      this.extractAndStoreToken(response);
       return response.data;
     } catch (error) {
       throw error.response?.data || { success: false, message: 'Network error' };
@@ -88,8 +108,12 @@ export const secureAuthService = {
   async logout() {
     try {
       const response = await api.post('/auth/logout');
+      // Clear localStorage token
+      localStorage.removeItem('token');
       return response.data;
     } catch (error) {
+      // Clear token even if logout fails
+      localStorage.removeItem('token');
       throw error.response?.data || { success: false, message: 'Network error' };
     }
   },
