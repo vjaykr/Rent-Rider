@@ -2,10 +2,9 @@ import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useSecureAuth } from '../context/SecureAuthContext';
 import { useDebounce } from '../hooks/useDebounce';
-import { showToast } from '../components/CustomToast';
 import '../styles/animations.css';
 
-// Memoized Icon Components for Performance
+// Icon Component
 const Icon = memo(({ d, className }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d={d} />
@@ -26,75 +25,122 @@ const icons = {
   earnings: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1",
   menu: "M4 6h16M4 12h16M4 18h16",
   close: "M6 18L18 6M6 6l12 12",
-  chevronDown: "M19 9l-7 7-7-7"
+  chevronDown: "M19 9l-7 7-7-7",
+  user: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
 };
 
-// Memoized Navigation Item Component
-const NavItem = memo(({ item, isActive, onClick }) => (
+// Mobile Navigation Item
+const MobileNavItem = memo(({ item, isActive, onClick }) => (
   <Link
     to={item.path}
     onClick={onClick}
-    className={`group flex items-center space-x-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+    className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
       isActive
-        ? 'text-white bg-gradient-to-r from-blue-600 to-blue-700 shadow-lg shadow-blue-500/25 transform scale-105'
-        : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50/80 hover:shadow-md hover:transform hover:scale-105'
+        ? 'bg-blue-600 text-white'
+        : 'text-gray-700 hover:bg-gray-100'
     }`}
   >
-    <Icon d={icons[item.icon]} className="h-4 w-4 transition-transform group-hover:scale-110" />
-    <span className="font-semibold">{item.name}</span>
+    <Icon d={icons[item.icon]} className="h-5 w-5" />
+    <span className="font-medium">{item.name}</span>
   </Link>
 ));
 
-// Memoized User Avatar Component
-const UserAvatar = memo(({ user, onClick, showDropdown, onLogout, setShowDropdown }) => (
-  <div className="relative">
-    <button
-      onClick={onClick}
-      className="group flex items-center space-x-3 px-4 py-2 rounded-xl bg-gradient-to-r from-gray-50 to-gray-100 hover:from-blue-50 hover:to-blue-100 border border-gray-200 hover:border-blue-300 transition-all duration-300 shadow-sm hover:shadow-lg transform hover:scale-105"
-    >
-      <div className="relative">
-        <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-full flex items-center justify-center shadow-lg">
-          <span className="text-white text-sm font-bold">
+// Desktop Navigation Item
+const DesktopNavItem = memo(({ item, isActive, onClick }) => (
+  <Link
+    to={item.path}
+    onClick={onClick}
+    className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+      isActive
+        ? 'text-white bg-blue-600 shadow-lg'
+        : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50'
+    }`}
+  >
+    <Icon d={icons[item.icon]} className="h-4 w-4" />
+    <span>{item.name}</span>
+  </Link>
+));
+
+// User Avatar Component
+const UserAvatar = memo(({ user, onClick, showDropdown, onLogout, setShowDropdown, isMobile = false }) => {
+  if (isMobile) {
+    return (
+      <div className="border-t border-gray-200 pt-4 mt-4">
+        <div className="flex items-center space-x-3 px-4 py-3 bg-gray-50 rounded-lg mb-3">
+          <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+            <span className="text-white text-sm font-bold">
+              {(user.firstName || user.fullName)?.charAt(0)?.toUpperCase() || 'U'}
+            </span>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">
+              {user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'User'}
+            </p>
+            <p className="text-xs text-gray-500 capitalize">{user.role || 'Member'}</p>
+          </div>
+        </div>
+        <Link
+          to="/profile"
+          onClick={onClick}
+          className="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg mb-2"
+        >
+          <Icon d={icons.about} className="h-5 w-5" />
+          <span className="font-medium">Profile Settings</span>
+        </Link>
+        <button
+          onClick={onLogout}
+          className="w-full flex items-center space-x-3 px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg"
+        >
+          <Icon d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" className="h-5 w-5" />
+          <span className="font-medium">Sign Out</span>
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <button
+        onClick={onClick}
+        className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 border border-gray-200 transition-colors"
+      >
+        <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+          <span className="text-white text-xs font-bold">
             {(user.firstName || user.fullName)?.charAt(0)?.toUpperCase() || 'U'}
           </span>
         </div>
-        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white animate-pulse" />
-      </div>
-      <div className="text-left">
-        <p className="text-sm font-semibold text-gray-900 group-hover:text-blue-700 transition-colors">
-          {user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'User'}
-        </p>
-        <p className="text-xs text-gray-500 capitalize">{user.role || 'Member'}</p>
-      </div>
-      <Icon 
-        d={icons.chevronDown} 
-        className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`} 
-      />
-    </button>
-    
-    {showDropdown && (
-      <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 animate-fade-in overflow-hidden">
-        <div className="p-2">
-          <Link
-            to="/profile"
-            onClick={() => setShowDropdown(false)}
-            className="flex items-center space-x-3 px-4 py-3 rounded-xl text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 group"
-          >
-            <Icon d={icons.about} className="h-5 w-5 group-hover:scale-110 transition-transform" />
-            <span className="font-medium">Profile Settings</span>
-          </Link>
-          <button
-            onClick={onLogout}
-            className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-red-600 hover:bg-red-50 transition-all duration-200 group"
-          >
-            <Icon d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" className="h-5 w-5 group-hover:scale-110 transition-transform" />
-            <span className="font-medium">Sign Out</span>
-          </button>
+        <div className="text-left hidden lg:block">
+          <p className="text-sm font-semibold text-gray-900 truncate max-w-24">
+            {user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'User'}
+          </p>
         </div>
-      </div>
-    )}
-  </div>
-));
+        <Icon d={icons.chevronDown} className={`h-4 w-4 text-gray-400 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
+      </button>
+      
+      {showDropdown && (
+        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-100 z-50">
+          <div className="p-2">
+            <Link
+              to="/profile"
+              onClick={() => setShowDropdown(false)}
+              className="flex items-center space-x-3 px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100"
+            >
+              <Icon d={icons.about} className="h-4 w-4" />
+              <span className="text-sm">Profile Settings</span>
+            </Link>
+            <button
+              onClick={onLogout}
+              className="w-full flex items-center space-x-3 px-3 py-2 rounded-md text-red-600 hover:bg-red-50"
+            >
+              <Icon d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" className="h-4 w-4" />
+              <span className="text-sm">Sign Out</span>
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+});
 
 // Main Navigation Component
 const Navigation = () => {
@@ -142,6 +188,7 @@ const Navigation = () => {
     if (debouncedSearch.trim()) {
       navigate(`/vehicles?search=${encodeURIComponent(debouncedSearch.trim())}`);
       setSearchQuery('');
+      setIsOpen(false);
     }
   }, [debouncedSearch, navigate]);
 
@@ -149,11 +196,10 @@ const Navigation = () => {
     logout();
     navigate('/');
     setShowDropdown(false);
+    setIsOpen(false);
   }, [logout, navigate]);
 
   const isActivePath = useCallback((path) => location.pathname === path, [location.pathname]);
-
-  // Removed auto-refresh on route change
 
   // Listen for profile updates
   useEffect(() => {
@@ -175,52 +221,41 @@ const Navigation = () => {
   }, [showDropdown]);
 
   return (
-    <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur-xl border-b border-gray-200/50 shadow-lg">
+    <nav className="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-3 group">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 transform group-hover:scale-110 overflow-hidden">
-              <img 
-                src="/images/logo.png" 
-                alt="RentRider Logo" 
-                className="w-8 h-8 object-contain bg-transparent"
-                style={{ backgroundColor: 'transparent', mixBlendMode: 'multiply' }}
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                  e.target.nextSibling.style.display = 'block';
-                }}
-              />
-              <span className="text-white font-bold text-lg hidden">R</span>
+          <Link to="/" className="flex items-center space-x-2 flex-shrink-0">
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-sm">R</span>
             </div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent">
-              RentRider
-            </span>
+            <span className="text-xl font-bold text-blue-600 hidden sm:block">RentRider</span>
+            <span className="text-lg font-bold text-blue-600 sm:hidden">RR</span>
           </Link>
 
-          {/* Desktop Search */}
+          {/* Desktop Search - Hidden on mobile */}
           {user && (
-            <div className="hidden md:flex flex-1 max-w-md mx-8">
+            <div className="hidden lg:flex flex-1 max-w-md mx-8">
               <form onSubmit={handleSearch} className="w-full">
-                <div className="relative group">
+                <div className="relative">
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search vehicles, locations..."
-                    className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300 group-hover:shadow-md"
+                    placeholder="Search vehicles..."
+                    className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
-                  <Icon d={icons.search} className="absolute left-4 top-3.5 h-5 w-5 text-gray-400" />
+                  <Icon d={icons.search} className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
                 </div>
               </form>
             </div>
           )}
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-2">
-            {navigationItems.map((item) => (
-              <NavItem
+          {/* Desktop Navigation - Hidden on mobile */}
+          <div className="hidden lg:flex items-center space-x-1">
+            {navigationItems.slice(0, 4).map((item) => (
+              <DesktopNavItem
                 key={item.name}
                 item={item}
                 isActive={isActivePath(item.path)}
@@ -231,14 +266,13 @@ const Navigation = () => {
             {!user ? (
               <Link
                 to="/login"
-                className="ml-4 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                className="ml-4 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
               >
                 Sign In
               </Link>
             ) : (
               <div className="ml-4" onClick={(e) => e.stopPropagation()}>
                 <UserAvatar
-                  key={`${user?.firstName}-${user?.lastName}-${user?.fullName}`}
                   user={user}
                   onClick={() => setShowDropdown(!showDropdown)}
                   showDropdown={showDropdown}
@@ -252,7 +286,7 @@ const Navigation = () => {
           {/* Mobile Menu Button */}
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="md:hidden p-2 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors"
+            className="lg:hidden p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
           >
             <Icon d={isOpen ? icons.close : icons.menu} className="h-6 w-6 text-gray-600" />
           </button>
@@ -260,10 +294,30 @@ const Navigation = () => {
 
         {/* Mobile Menu */}
         {isOpen && (
-          <div className="md:hidden py-4 animate-slide-in">
-            <div className="space-y-2">
+          <div className="lg:hidden py-4 border-t border-gray-200">
+            
+            {/* Mobile Search */}
+            {user && (
+              <div className="mb-4">
+                <form onSubmit={handleSearch}>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search vehicles..."
+                      className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <Icon d={icons.search} className="absolute left-3 top-3.5 h-5 w-5 text-gray-400" />
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {/* Mobile Navigation Items */}
+            <div className="space-y-1">
               {navigationItems.map((item) => (
-                <NavItem
+                <MobileNavItem
                   key={item.name}
                   item={item}
                   isActive={isActivePath(item.path)}
@@ -272,16 +326,24 @@ const Navigation = () => {
               ))}
             </div>
             
-            {!user && (
+            {/* Mobile Auth Section */}
+            {!user ? (
               <div className="mt-4 pt-4 border-t border-gray-200">
                 <Link
                   to="/login"
                   onClick={() => setIsOpen(false)}
-                  className="block w-full text-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-semibold"
+                  className="block w-full text-center px-4 py-3 bg-blue-600 text-white rounded-lg font-medium"
                 >
                   Sign In
                 </Link>
               </div>
+            ) : (
+              <UserAvatar
+                user={user}
+                onClick={() => setIsOpen(false)}
+                onLogout={handleLogout}
+                isMobile={true}
+              />
             )}
           </div>
         )}

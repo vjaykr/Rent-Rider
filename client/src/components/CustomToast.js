@@ -19,7 +19,7 @@ const SimpleToast = ({ t, message, type = 'default' }) => {
   };
 
   const getStyles = () => {
-    const baseStyles = 'flex items-center justify-between w-full p-3 rounded-lg shadow-lg border transition-all duration-200';
+    const baseStyles = 'flex items-center justify-between w-full max-w-sm p-3 rounded-lg shadow-lg border transition-all duration-200';
     
     switch (type) {
       case 'success':
@@ -114,20 +114,22 @@ export const showToast = {
   dismiss: (toastId) => toast.dismiss(toastId)
 };
 
-// Simple Toaster Component
+// Mobile-Responsive Toaster Component
 export const EnhancedToaster = () => (
   <Toaster
     position="top-right"
     containerStyle={{
       top: 20,
       right: 20,
+      left: 20,
       zIndex: 9999
     }}
     toastOptions={{
       style: {
         background: 'transparent',
         boxShadow: 'none',
-        padding: 0
+        padding: 0,
+        maxWidth: '100%'
       }
     }}
   />

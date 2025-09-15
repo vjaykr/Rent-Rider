@@ -5,6 +5,7 @@ import { Routes, Route } from 'react-router-dom';
 import LoadingSpinner from './components/LoadingSpinner';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import ScrollToTop from './components/ScrollToTop';
 
 // Pages (Lazy loaded for better performance)
 const Dashboard = React.lazy(() => import('./pages/Dashboard/Dashboard'));
@@ -19,6 +20,7 @@ const Login = React.lazy(() => import('./pages/Login'));
 const PrivacyPolicy = React.lazy(() => import('./components/Legal/Privacy_Policy'));
 const TermsOfService = React.lazy(() => import('./components/Legal/Terms_Of_Service'));
 const CookiePolicy = React.lazy(() => import('./components/Legal/Cookie_Policy'));
+const RefundPolicy = React.lazy(() => import('./components/Legal/Refund_Policy'));
 
 function App() {
   return (
@@ -34,6 +36,7 @@ function App() {
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/terms-of-service" element={<TermsOfService />} />
           <Route path="/cookie-policy" element={<CookiePolicy />} />
+          <Route path="/refund-policy" element={<RefundPolicy />} />
           
           {/* Protected Admin Routes with Layout */}
           <Route 
@@ -110,6 +113,7 @@ function App() {
           />
         </Routes>
       </Suspense>
+      <ScrollToTop />
     </div>
   );
 }

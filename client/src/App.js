@@ -7,7 +7,9 @@ import Navigation from './components/Navigation';
 import Footer from './components/Footer';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
+import ScrollToTop from './components/ScrollToTop';
 import './styles/animations.css';
+import './styles/mobile.css';
 
 // Lazy load all pages for optimal performance
 const Home = lazy(() => import('./pages/Home/Home'));
@@ -35,6 +37,7 @@ const NotFound = lazy(() => import('./pages/NotFound'));
 const PrivacyPolicy = lazy(() => import('./components/Legal/Privacy_Policy'));
 const TermsOfService = lazy(() => import('./components/Legal/Terms_Of_Service'));
 const CookiePolicy = lazy(() => import('./components/Legal/Cookie_Policy'));
+const RefundPolicy = lazy(() => import('./components/Legal/Refund_Policy'));
 const OwnerLayout = lazy(() => import('./layouts/OwnerLayout'));
 
 function App() {
@@ -67,6 +70,7 @@ function App() {
               <Route path="/privacy-policy" element={<PrivacyPolicy />} />
               <Route path="/terms-of-service" element={<TermsOfService />} />
               <Route path="/cookie-policy" element={<CookiePolicy />} />
+              <Route path="/refund-policy" element={<RefundPolicy />} />
               
               {/* Protected Routes - General */}
               <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
@@ -95,6 +99,7 @@ function App() {
         </main>
         
         <Footer />
+        <ScrollToTop />
         
         <EnhancedToaster />
       </div>

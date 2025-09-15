@@ -19,6 +19,9 @@ const Footer = () => {
             <Link to="/cookie-policy" className="text-gray-400 hover:text-gray-600 text-sm">
               Cookie Policy
             </Link>
+            <Link to="/refund-policy" className="text-gray-400 hover:text-gray-600 text-sm">
+              Refund Policy
+            </Link>
           </div>
         </div>
       </div>
