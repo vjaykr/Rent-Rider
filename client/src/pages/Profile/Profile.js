@@ -47,6 +47,10 @@ const Profile = () => {
     confirmPassword: ''
   });
   const [passwordErrors, setPasswordErrors] = useState({});
+  const [roleChangeWarning, setRoleChangeWarning] = useState(false);
+  const [missingFields, setMissingFields] = useState([]);
+  const [completionStats, setCompletionStats] = useState({ completed: 0, total: 0, percentage: 0 });
+
 
   // Fetch complete profile data from database
   const fetchProfile = async () => {
@@ -77,8 +81,9 @@ const Profile = () => {
           ownerDetails: {
             aadharNumber: userData.ownerDetails?.aadharNumber || '',
             panNumber: userData.ownerDetails?.panNumber || '',
-            businessName: userData.ownerDetails?.businessName || '',
-            businessLicense: userData.ownerDetails?.businessLicense || '',
+            vehicleRegistration: userData.ownerDetails?.vehicleRegistration || '',
+            insuranceNumber: userData.ownerDetails?.insuranceNumber || '',
+            insuranceExpiry: userData.ownerDetails?.insuranceExpiry ? new Date(userData.ownerDetails.insuranceExpiry).toISOString().split('T')[0] : '',
             bankDetails: {
               accountNumber: userData.ownerDetails?.bankDetails?.accountNumber || '',
               ifscCode: userData.ownerDetails?.bankDetails?.ifscCode || '',
@@ -99,16 +104,44 @@ const Profile = () => {
     fetchProfile();
   }, []);
 
+  useEffect(() => {
+    updateCompletionStats();
+  }, [formData, formData.role]);
+
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+    
+    // Input validations
+    if (name === 'ownerDetails.aadharNumber') {
+      value = value.replace(/\D/g, '').slice(0, 12);
+    } else if (name === 'ownerDetails.panNumber') {
+      const cleaned = value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (cleaned.length <= 5) {
+        value = cleaned.replace(/[^A-Z]/g, '');
+      } else if (cleaned.length <= 9) {
+        value = cleaned.slice(0, 5).replace(/[^A-Z]/g, '') + cleaned.slice(5).replace(/[^0-9]/g, '');
+      } else {
+        value = cleaned.slice(0, 5).replace(/[^A-Z]/g, '') + cleaned.slice(5, 9).replace(/[^0-9]/g, '') + cleaned.slice(9, 10).replace(/[^A-Z]/g, '');
+      }
+      value = value.slice(0, 10);
+    } else if (name === 'ownerDetails.bankDetails.accountNumber') {
+      value = value.replace(/\D/g, '');
+    } else if (name === 'ownerDetails.bankDetails.ifscCode') {
+      value = value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 11);
+    } else if (name === 'drivingLicense.number') {
+      value = value.toUpperCase();
+    }
     
     if (name.includes('.')) {
-      const [parent, child] = name.split('.');
+      const [parent, child, grandchild] = name.split('.');
       setFormData(prev => ({
         ...prev,
         [parent]: {
           ...prev[parent],
-          [child]: value
+          [child]: grandchild ? {
+            ...prev[parent][child],
+            [grandchild]: value
+          } : value
         }
       }));
     } else {
@@ -117,6 +150,116 @@ const Profile = () => {
         [name]: value
       }));
     }
+    
+    // Real-time validation
+    validateField(name, value);
+    
+    // Handle role change
+    if (name === 'role' && value !== profileData?.role) {
+      setRoleChangeWarning(true);
+      checkMissingFields(value);
+    }
+  };
+
+  const validateField = (name, value) => {
+    const newErrors = { ...errors };
+    
+    // Clear existing error for this field
+    const fieldKey = name.split('.').pop();
+    delete newErrors[fieldKey];
+    
+    // Validate based on field
+    if (name === 'firstName' && !value.trim()) {
+      newErrors.firstName = 'First name is required';
+    } else if (name === 'phone') {
+      if (!value.trim()) {
+        newErrors.phone = 'Mobile number is required';
+      } else if (!/^[0-9]{10}$/.test(value.replace(/\D/g, ''))) {
+        newErrors.phone = 'Must be 10 digits';
+      }
+
+    } else if (name === 'ownerDetails.aadharNumber') {
+      if (!value.trim()) newErrors.aadharNumber = 'Required';
+      else if (!/^\d{12}$/.test(value)) newErrors.aadharNumber = 'Must be 12 digits';
+    } else if (name === 'ownerDetails.panNumber') {
+      if (!value.trim()) newErrors.panNumber = 'Required';
+      else if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(value)) newErrors.panNumber = 'Format: ABCDE1234F';
+    } else if (formData.role === 'owner') {
+      if (name === 'ownerDetails.vehicleRegistration' && !value.trim()) {
+        newErrors.vehicleRegistration = 'Required';
+      } else if (name === 'ownerDetails.insuranceNumber' && !value.trim()) {
+        newErrors.insuranceNumber = 'Required';
+      } else if (name === 'ownerDetails.bankDetails.accountNumber' && !value.trim()) {
+        newErrors.accountNumber = 'Required';
+      } else if (name === 'ownerDetails.bankDetails.ifscCode') {
+        if (!value.trim()) newErrors.ifscCode = 'Required';
+        else if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(value)) newErrors.ifscCode = 'Invalid IFSC format';
+      } else if (name === 'ownerDetails.bankDetails.accountHolderName' && !value.trim()) {
+        newErrors.accountHolderName = 'Required';
+      }
+    }
+    
+    setErrors(newErrors);
+  };
+
+  const updateCompletionStats = () => {
+    const allFields = [
+      'firstName', 'lastName', 'phone', 'dateOfBirth',
+      'address.street', 'address.city', 'address.state', 'address.zipCode',
+      'drivingLicense.number', 'drivingLicense.expiryDate',
+      'ownerDetails.aadharNumber', 'ownerDetails.panNumber'
+    ];
+    
+    if (formData.role === 'owner') {
+      allFields.push(
+        'ownerDetails.vehicleRegistration',
+        'ownerDetails.insuranceNumber',
+        'ownerDetails.insuranceExpiry',
+        'ownerDetails.bankDetails.accountNumber',
+        'ownerDetails.bankDetails.ifscCode',
+        'ownerDetails.bankDetails.accountHolderName'
+      );
+    }
+    
+    const completed = allFields.filter(field => {
+      const value = field.includes('.') ? 
+        field.split('.').reduce((obj, key) => obj?.[key], formData) : 
+        formData[field];
+      return value && value.toString().trim();
+    }).length;
+    
+    const total = allFields.length;
+    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+    
+    setCompletionStats({ completed, total, percentage });
+    
+    const missing = allFields.filter(field => {
+      const value = field.includes('.') ? 
+        field.split('.').reduce((obj, key) => obj?.[key], formData) : 
+        formData[field];
+      return !value || !value.toString().trim();
+    }).map(field => {
+      const fieldNames = {
+        'firstName': 'First Name', 'lastName': 'Last Name', 'phone': 'Mobile Number',
+        'dateOfBirth': 'Date of Birth', 'address.street': 'Street Address',
+        'address.city': 'City', 'address.state': 'State', 'address.zipCode': 'ZIP Code',
+        'drivingLicense.number': 'License Number', 'drivingLicense.expiryDate': 'License Expiry',
+        'ownerDetails.aadharNumber': 'Aadhar Number', 'ownerDetails.panNumber': 'PAN Number',
+        'ownerDetails.vehicleRegistration': 'Vehicle Registration',
+        'ownerDetails.insuranceNumber': 'Insurance Number', 'ownerDetails.insuranceExpiry': 'Insurance Expiry',
+        'ownerDetails.bankDetails.accountNumber': 'Bank Account',
+        'ownerDetails.bankDetails.ifscCode': 'IFSC Code',
+        'ownerDetails.bankDetails.accountHolderName': 'Account Holder Name'
+      };
+      return fieldNames[field] || field;
+    });
+    
+    setMissingFields(missing);
+  };
+
+  const checkMissingFields = (role) => {
+    updateCompletionStats();
+    return missingFields;
   };
 
   const validateForm = () => {
@@ -138,6 +281,48 @@ const Profile = () => {
       newErrors.phone = 'Mobile number must be 10 digits';
     }
     
+    // Driving license validation for all users
+    if (!formData.drivingLicense.number.trim()) {
+      newErrors.drivingLicense = 'Driving license number is required';
+    }
+    
+    // Role-specific validation
+    if (formData.role === 'owner') {
+      if (!formData.ownerDetails.aadharNumber.trim()) {
+        newErrors.aadharNumber = 'Aadhar number is required';
+      } else if (!/^\d{12}$/.test(formData.ownerDetails.aadharNumber)) {
+        newErrors.aadharNumber = 'Must be exactly 12 digits';
+      }
+      
+      if (!formData.ownerDetails.panNumber.trim()) {
+        newErrors.panNumber = 'PAN number is required';
+      } else if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(formData.ownerDetails.panNumber)) {
+        newErrors.panNumber = 'Format: ABCDE1234F';
+      }
+      
+      if (!formData.ownerDetails.vehicleRegistration.trim()) {
+        newErrors.vehicleRegistration = 'Vehicle registration is required';
+      }
+      
+      if (!formData.ownerDetails.insuranceNumber.trim()) {
+        newErrors.insuranceNumber = 'Insurance number is required';
+      }
+      
+      if (!formData.ownerDetails.bankDetails.accountNumber.trim()) {
+        newErrors.accountNumber = 'Account number is required';
+      }
+      
+      if (!formData.ownerDetails.bankDetails.ifscCode.trim()) {
+        newErrors.ifscCode = 'IFSC code is required';
+      } else if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(formData.ownerDetails.bankDetails.ifscCode)) {
+        newErrors.ifscCode = 'Invalid IFSC format';
+      }
+      
+      if (!formData.ownerDetails.bankDetails.accountHolderName.trim()) {
+        newErrors.accountHolderName = 'Account holder name is required';
+      }
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -157,6 +342,7 @@ const Profile = () => {
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         phone: formData.phone.trim(),
+        role: formData.role,
         dateOfBirth: formData.dateOfBirth || null,
         address: {
           street: formData.address.street.trim(),
@@ -171,13 +357,36 @@ const Profile = () => {
         }
       };
       
+      // Include owner details if role is owner
+      if (formData.role === 'owner') {
+        updateData.ownerDetails = {
+          aadharNumber: formData.ownerDetails.aadharNumber.trim(),
+          panNumber: formData.ownerDetails.panNumber.trim(),
+          vehicleRegistration: formData.ownerDetails.vehicleRegistration.trim(),
+          insuranceNumber: formData.ownerDetails.insuranceNumber.trim(),
+          insuranceExpiry: formData.ownerDetails.insuranceExpiry || null,
+          bankDetails: {
+            accountNumber: formData.ownerDetails.bankDetails.accountNumber.trim(),
+            ifscCode: formData.ownerDetails.bankDetails.ifscCode.trim(),
+            accountHolderName: formData.ownerDetails.bankDetails.accountHolderName.trim()
+          }
+        };
+      }
+      
       const response = await secureAuthService.updateProfile(updateData);
       
       if (response.success) {
         setIsEditing(false);
         setErrors({});
+        setRoleChangeWarning(false);
+        setMissingFields([]);
         await fetchProfile();
-        showToast.success('Profile updated successfully!');
+        
+        if (formData.role !== profileData?.role) {
+          showToast.success(`Role changed to ${formData.role === 'owner' ? 'Owner' : 'Customer'}!`);
+        } else {
+          showToast.success('Profile updated successfully!');
+        }
       } else {
         showToast.error(response.message || 'Failed to update profile');
       }
@@ -271,8 +480,9 @@ const Profile = () => {
         ownerDetails: {
           aadharNumber: profileData.ownerDetails?.aadharNumber || '',
           panNumber: profileData.ownerDetails?.panNumber || '',
-          businessName: profileData.ownerDetails?.businessName || '',
-          businessLicense: profileData.ownerDetails?.businessLicense || '',
+          vehicleRegistration: profileData.ownerDetails?.vehicleRegistration || '',
+          insuranceNumber: profileData.ownerDetails?.insuranceNumber || '',
+          insuranceExpiry: profileData.ownerDetails?.insuranceExpiry ? new Date(profileData.ownerDetails.insuranceExpiry).toISOString().split('T')[0] : '',
           bankDetails: {
             accountNumber: profileData.ownerDetails?.bankDetails?.accountNumber || '',
             ifscCode: profileData.ownerDetails?.bankDetails?.ifscCode || '',
@@ -284,6 +494,8 @@ const Profile = () => {
     setErrors({});
     setIsEditing(false);
   };
+
+
 
   if (initialLoading) {
     return (
@@ -489,7 +701,39 @@ const Profile = () => {
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Driving License Number
+                Account Type <span className="text-red-500">*</span>
+              </label>
+              <div className="flex space-x-3">
+                <button
+                  type="button"
+                  onClick={() => isEditing && handleInputChange({ target: { name: 'role', value: 'customer' } })}
+                  disabled={!isEditing}
+                  className={`flex-1 px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
+                    formData.role === 'customer'
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400'
+                  } ${!isEditing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                >
+                  Customer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => isEditing && handleInputChange({ target: { name: 'role', value: 'owner' } })}
+                  disabled={!isEditing}
+                  className={`flex-1 px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
+                    formData.role === 'owner'
+                      ? 'bg-purple-600 text-white border-purple-600'
+                      : 'bg-white text-gray-700 border-gray-300 hover:border-purple-400'
+                  } ${!isEditing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                >
+                  Vehicle Owner
+                </button>
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Driving License Number <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -497,8 +741,12 @@ const Profile = () => {
                 value={formData.drivingLicense.number}
                 onChange={handleInputChange}
                 disabled={!isEditing}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
+                  errors.drivingLicense ? 'border-red-500' : 'border-gray-300'
+                }`}
+                placeholder="MH1420110012345"
               />
+              {errors.drivingLicense && <p className="text-red-500 text-sm mt-1">{errors.drivingLicense}</p>}
             </div>
             
             <div>
@@ -513,6 +761,44 @@ const Profile = () => {
                 disabled={!isEditing}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
               />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Aadhar Number <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="ownerDetails.aadharNumber"
+                value={formData.ownerDetails.aadharNumber}
+                onChange={handleInputChange}
+                disabled={!isEditing}
+                inputMode="numeric"
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
+                  errors.aadharNumber ? 'border-red-500' : 'border-gray-300'
+                }`}
+                placeholder="123456789012"
+              />
+              {errors.aadharNumber && <p className="text-red-500 text-sm mt-1">{errors.aadharNumber}</p>}
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                PAN Number <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="ownerDetails.panNumber"
+                value={formData.ownerDetails.panNumber}
+                onChange={handleInputChange}
+                disabled={!isEditing}
+                style={{ textTransform: 'uppercase' }}
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
+                  errors.panNumber ? 'border-red-500' : 'border-gray-300'
+                }`}
+                placeholder="ABCDE1234F"
+              />
+              {errors.panNumber && <p className="text-red-500 text-sm mt-1">{errors.panNumber}</p>}
             </div>
             
             <div className="md:col-span-2">
@@ -598,135 +884,244 @@ const Profile = () => {
             {formData.role === 'owner' && (
               <>
                 <div className="md:col-span-2">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">Owner Details</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">Vehicle Owner Information</h3>
+                </div>
+                
+
+                
+
+                
+                {/* Vehicle Information */}
+                <div className="md:col-span-2">
+                  <h4 className="text-md font-semibold text-gray-800 mb-3 flex items-center">
+                    <svg className="w-4 h-4 mr-2 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
+                      <path d="M3 4a1 1 0 00-1 1v10a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H10a1 1 0 001-1V5a1 1 0 00-1-1H3zM14 7a1 1 0 00-1 1v8a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H21a1 1 0 001-1V8a1 1 0 00-1-1h-7z" />
+                    </svg>
+                    Vehicle Information
+                  </h4>
                 </div>
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Aadhar Number
+                    Vehicle Registration Number <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
-                    name="ownerDetails.aadharNumber"
-                    value={formData.ownerDetails.aadharNumber}
+                    name="ownerDetails.vehicleRegistration"
+                    value={formData.ownerDetails.vehicleRegistration}
                     onChange={handleInputChange}
                     disabled={!isEditing}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
-                    placeholder="12-digit Aadhar number"
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
+                      errors.vehicleRegistration ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="MH12AB1234"
                   />
+                  {errors.vehicleRegistration && <p className="text-red-500 text-xs mt-1">{errors.vehicleRegistration}</p>}
                 </div>
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    PAN Number
+                    Insurance Policy Number <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
-                    name="ownerDetails.panNumber"
-                    value={formData.ownerDetails.panNumber}
+                    name="ownerDetails.insuranceNumber"
+                    value={formData.ownerDetails.insuranceNumber}
                     onChange={handleInputChange}
                     disabled={!isEditing}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
-                    placeholder="ABCDE1234F"
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
+                      errors.insuranceNumber ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="Insurance policy number"
                   />
+                  {errors.insuranceNumber && <p className="text-red-500 text-xs mt-1">{errors.insuranceNumber}</p>}
                 </div>
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Business Name
+                    Insurance Expiry Date
                   </label>
                   <input
-                    type="text"
-                    name="ownerDetails.businessName"
-                    value={formData.ownerDetails.businessName}
+                    type="date"
+                    name="ownerDetails.insuranceExpiry"
+                    value={formData.ownerDetails.insuranceExpiry}
                     onChange={handleInputChange}
                     disabled={!isEditing}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
-                    placeholder="Your business name"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
                   />
+                </div>
+                
+
+                
+                {/* Banking Information */}
+                <div className="md:col-span-2">
+                  <h4 className="text-md font-semibold text-gray-800 mb-3 flex items-center">
+                    <svg className="w-4 h-4 mr-2 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" />
+                      <path fillRule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clipRule="evenodd" />
+                    </svg>
+                    Banking Information
+                  </h4>
                 </div>
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Business License
+                    Account Number <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
-                    name="ownerDetails.businessLicense"
-                    value={formData.ownerDetails.businessLicense}
+                    name="ownerDetails.bankDetails.accountNumber"
+                    value={formData.ownerDetails.bankDetails.accountNumber}
                     onChange={handleInputChange}
                     disabled={!isEditing}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
-                    placeholder="Business license number"
+                    inputMode="numeric"
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
+                      errors.accountNumber ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="1234567890123456"
                   />
+                  {errors.accountNumber && <p className="text-red-500 text-xs mt-1">{errors.accountNumber}</p>}
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    IFSC Code <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="ownerDetails.bankDetails.ifscCode"
+                    value={formData.ownerDetails.bankDetails.ifscCode}
+                    onChange={handleInputChange}
+                    disabled={!isEditing}
+                    style={{ textTransform: 'uppercase' }}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
+                      errors.ifscCode ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="SBIN0001234"
+                  />
+                  {errors.ifscCode && <p className="text-red-500 text-xs mt-1">{errors.ifscCode}</p>}
                 </div>
                 
                 <div className="md:col-span-2">
-                  <h4 className="text-md font-medium text-gray-800 mb-3">Bank Details</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input
-                      type="text"
-                      name="ownerDetails.bankDetails.accountNumber"
-                      value={formData.ownerDetails.bankDetails.accountNumber}
-                      onChange={handleInputChange}
-                      disabled={!isEditing}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
-                      placeholder="Account Number"
-                    />
-                    <input
-                      type="text"
-                      name="ownerDetails.bankDetails.ifscCode"
-                      value={formData.ownerDetails.bankDetails.ifscCode}
-                      onChange={handleInputChange}
-                      disabled={!isEditing}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
-                      placeholder="IFSC Code"
-                    />
-                    <div className="md:col-span-2">
-                      <input
-                        type="text"
-                        name="ownerDetails.bankDetails.accountHolderName"
-                        value={formData.ownerDetails.bankDetails.accountHolderName}
-                        onChange={handleInputChange}
-                        disabled={!isEditing}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
-                        placeholder="Account Holder Name"
-                      />
-                    </div>
-                  </div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Account Holder Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="ownerDetails.bankDetails.accountHolderName"
+                    value={formData.ownerDetails.bankDetails.accountHolderName}
+                    onChange={handleInputChange}
+                    disabled={!isEditing}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
+                      errors.accountHolderName ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="Account holder name"
+                  />
+                  {errors.accountHolderName && <p className="text-red-500 text-xs mt-1">{errors.accountHolderName}</p>}
                 </div>
               </>
             )}
           </div>
           
           {isEditing && (
-            <div className="flex justify-end space-x-4 mt-8 pt-6 border-t">
-              <button
-                type="button"
-                onClick={handleCancel}
-                disabled={loading}
-                className="px-8 py-3 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all disabled:opacity-50 flex items-center font-medium shadow-lg"
-              >
-                {loading && (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                )}
-                {loading ? 'Updating...' : 'Save Changes'}
-              </button>
+            <div className="mt-8 pt-6 border-t">
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200 mb-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
+                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">Profile Completion</h3>
+                      <p className="text-sm text-gray-600">Complete your profile information</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="flex items-center justify-end space-x-2 mb-1">
+                      <span className="text-xs font-medium text-gray-600">
+                        {completionStats.completed}/{completionStats.total} completed
+                      </span>
+                      <span className={`text-xs font-bold ${
+                        completionStats.percentage === 100 ? 'text-green-600' : 
+                        completionStats.percentage >= 50 ? 'text-blue-600' : 'text-orange-600'
+                      }`}>
+                        {completionStats.percentage}%
+                      </span>
+                    </div>
+                    <div className="w-24 bg-gray-200 rounded-full h-2">
+                      <div 
+                        className={`h-2 rounded-full transition-all duration-500 ${
+                          completionStats.percentage === 100 ? 'bg-green-500' :
+                          completionStats.percentage >= 50 ? 'bg-blue-500' : 'bg-orange-500'
+                        }`}
+                        style={{ width: `${completionStats.percentage}%` }}
+                      ></div>
+                    </div>
+                    {missingFields.length > 0 && (
+                      <p className="text-xs text-gray-500 mt-1">{missingFields.length} remaining</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end space-x-4">
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  disabled={loading}
+                  className="px-8 py-3 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all disabled:opacity-50 flex items-center font-medium shadow-lg"
+                >
+                  {loading && (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  )}
+                  {loading ? 'Updating...' : 'Save Changes'}
+                </button>
+              </div>
             </div>
           )}
           
           {!isEditing && (
-            <div className="mt-6 pt-6 border-t text-center">
-              <p className="text-gray-500 text-sm">
-                <span className="text-red-500">*</span> Required fields for profile completion
-              </p>
+            <div className="mt-6 pt-6 border-t">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-gray-500 text-sm">
+                  <span className="text-red-500">*</span> Required fields for profile completion
+                </p>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-medium text-gray-600">
+                    {completionStats.completed}/{completionStats.total}
+                  </span>
+                  <div className="w-16 bg-gray-200 rounded-full h-1.5">
+                    <div 
+                      className={`h-1.5 rounded-full transition-all duration-300 ${
+                        completionStats.percentage === 100 ? 'bg-green-500' :
+                        completionStats.percentage >= 50 ? 'bg-blue-500' : 'bg-orange-500'
+                      }`}
+                      style={{ width: `${completionStats.percentage}%` }}
+                    ></div>
+                  </div>
+                  <span className={`text-xs font-bold ${
+                    completionStats.percentage === 100 ? 'text-green-600' : 
+                    completionStats.percentage >= 50 ? 'text-blue-600' : 'text-orange-600'
+                  }`}>
+                    {completionStats.percentage}%
+                  </span>
+                </div>
+              </div>
+              {missingFields.length > 0 && (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                  <p className="text-sm text-orange-800 font-medium mb-1">Missing Required Fields:</p>
+                  <p className="text-xs text-orange-700">{missingFields.join(', ')}</p>
+                </div>
+              )}
             </div>
           )}
         </form>
@@ -829,6 +1224,8 @@ const Profile = () => {
             </div>
           </div>
         )}
+        
+
       </div>
     </div>
   );

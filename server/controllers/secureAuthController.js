@@ -69,9 +69,11 @@ const createUserResponse = (user) => ({
     photoURL: user.photoURL,
     phone: user.phone,
     bio: user.bio,
+    role: user.role,
     dateOfBirth: user.dateOfBirth,
     address: user.address,
     drivingLicense: user.drivingLicense,
+    ownerDetails: user.ownerDetails,
     isProfileComplete: user.isProfileComplete,
     hasPassword: user.hasPassword,
     createdAt: user.createdAt
@@ -394,6 +396,7 @@ const updateProfile = async (req, res) => {
       lastName: Joi.string().max(50).optional(),
       phone: Joi.string().pattern(/^[6-9]\d{9}$/).allow('').optional(),
       bio: Joi.string().max(500).allow('').optional(),
+      role: Joi.string().valid('customer', 'owner').optional(),
       dateOfBirth: Joi.date().optional(),
       address: Joi.object({
         street: Joi.string().allow('').optional(),
@@ -405,6 +408,18 @@ const updateProfile = async (req, res) => {
       drivingLicense: Joi.object({
         number: Joi.string().allow('').optional(),
         expiryDate: Joi.date().optional()
+      }).optional(),
+      ownerDetails: Joi.object({
+        aadharNumber: Joi.string().pattern(/^\d{12}$/).allow('').optional(),
+        panNumber: Joi.string().pattern(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/).allow('').optional(),
+        vehicleRegistration: Joi.string().allow('').optional(),
+        insuranceNumber: Joi.string().allow('').optional(),
+        insuranceExpiry: Joi.date().allow(null).optional(),
+        bankDetails: Joi.object({
+          accountNumber: Joi.string().allow('').optional(),
+          ifscCode: Joi.string().pattern(/^[A-Z]{4}0[A-Z0-9]{6}$/).allow('').optional(),
+          accountHolderName: Joi.string().allow('').optional()
+        }).optional()
       }).optional()
     });
 
@@ -418,31 +433,142 @@ const updateProfile = async (req, res) => {
 
     const userId = req.user.userId;
     
+    // Get current user for role validation
+    const currentUser = await User.findById(userId);
+    if (!currentUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
     // Prepare update object
     const updateObj = { ...value };
     
     // Update fullName if firstName or lastName provided
     if (value.firstName || value.lastName) {
-      const user = await User.findById(userId);
-      const firstName = value.firstName || user.firstName;
-      const lastName = value.lastName || user.lastName;
+      const firstName = value.firstName || currentUser.firstName;
+      const lastName = value.lastName || currentUser.lastName;
       updateObj.fullName = `${firstName} ${lastName}`;
     }
     
-    const user = await User.findByIdAndUpdate(
-      userId,
-      updateObj,
-      { new: true, runValidators: true }
-    );
-
+    // Handle role change and owner details validation
+    if (value.role === 'owner' && value.ownerDetails) {
+      const { ownerDetails } = value;
+      
+      // Validate required fields for owners
+      const requiredFields = ['aadharNumber', 'panNumber', 'vehicleRegistration', 'insuranceNumber'];
+      const bankFields = ['accountNumber', 'ifscCode', 'accountHolderName'];
+      
+      for (const field of requiredFields) {
+        if (!ownerDetails[field] || !ownerDetails[field].trim()) {
+          return res.status(400).json({
+            success: false,
+            message: `${field.replace(/([A-Z])/g, ' $1').toLowerCase()} is required for owners`
+          });
+        }
+      }
+      
+      if (ownerDetails.bankDetails) {
+        for (const field of bankFields) {
+          if (!ownerDetails.bankDetails[field] || !ownerDetails.bankDetails[field].trim()) {
+            return res.status(400).json({
+              success: false,
+              message: `${field.replace(/([A-Z])/g, ' $1').toLowerCase()} is required for owners`
+            });
+          }
+        }
+      }
+      
+      // Format validation
+      if (!/^\d{12}$/.test(ownerDetails.aadharNumber)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Aadhar number must be exactly 12 digits'
+        });
+      }
+      
+      if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(ownerDetails.panNumber)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid PAN number format (ABCDE1234F)'
+        });
+      }
+      
+      if (ownerDetails.bankDetails && ownerDetails.bankDetails.ifscCode && 
+          !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ownerDetails.bankDetails.ifscCode)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid IFSC code format'
+        });
+      }
+    }
+    
+    // Use findById and save for better validation handling
+    const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({
         success: false,
         message: 'User not found'
       });
     }
+    
+    // Update user fields
+    Object.keys(updateObj).forEach(key => {
+      if (key === 'ownerDetails' && updateObj[key]) {
+        // Initialize ownerDetails if it doesn't exist
+        if (!user.ownerDetails) {
+          user.ownerDetails = {};
+        }
+        
+        // Merge ownerDetails properly
+        const currentOwnerDetails = user.ownerDetails.toObject ? user.ownerDetails.toObject() : user.ownerDetails;
+        const newOwnerDetails = updateObj[key];
+        
+        user.ownerDetails = {
+          ...currentOwnerDetails,
+          ...newOwnerDetails
+        };
+        
+        // Handle bankDetails separately if provided
+        if (newOwnerDetails.bankDetails) {
+          const currentBankDetails = currentOwnerDetails.bankDetails || {};
+          user.ownerDetails.bankDetails = {
+            ...currentBankDetails,
+            ...newOwnerDetails.bankDetails
+          };
+        }
+        
+        // Mark as modified for mongoose
+        user.markModified('ownerDetails');
+      } else if (key === 'address' && updateObj[key]) {
+        // Handle address updates
+        const currentAddress = user.address?.toObject ? user.address.toObject() : user.address || {};
+        user.address = {
+          ...currentAddress,
+          ...updateObj[key]
+        };
+        user.markModified('address');
+      } else if (key === 'drivingLicense' && updateObj[key]) {
+        // Handle drivingLicense updates
+        const currentLicense = user.drivingLicense?.toObject ? user.drivingLicense.toObject() : user.drivingLicense || {};
+        user.drivingLicense = {
+          ...currentLicense,
+          ...updateObj[key]
+        };
+        user.markModified('drivingLicense');
+      } else {
+        user[key] = updateObj[key];
+      }
+    });
+    
+    await user.save();
 
-    logger.info('User profile updated', { userId, updates: Object.keys(value) });
+    logger.info('User profile updated', { 
+      userId, 
+      updates: Object.keys(value),
+      roleChanged: value.role && value.role !== currentUser.role
+    });
 
     res.json({
       success: true,
@@ -453,11 +579,57 @@ const updateProfile = async (req, res) => {
   } catch (error) {
     logger.error('Profile update error', { 
       userId: req.user?.userId, 
+      error: error.message,
+      stack: error.stack
+    });
+    
+    // Handle mongoose validation errors
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: validationErrors[0] || 'Validation failed'
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update profile'
+    });
+  }
+};
+
+// Delete profile
+const deleteProfile = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    await User.findByIdAndDelete(userId);
+    res.clearCookie('authToken');
+    
+    logger.info('User profile deleted', { userId, email: user.email });
+    
+    res.json({
+      success: true,
+      message: 'Profile deleted successfully'
+    });
+    
+  } catch (error) {
+    logger.error('Delete profile error', { 
+      userId: req.user?.userId, 
       error: error.message 
     });
     res.status(500).json({
       success: false,
-      message: 'Failed to update profile'
+      message: 'Failed to delete profile'
     });
   }
 };
@@ -488,5 +660,6 @@ module.exports = {
   getCurrentUser,
   updateProfile,
   changePassword,
+  deleteProfile,
   logout
 };

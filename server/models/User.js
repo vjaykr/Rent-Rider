@@ -125,57 +125,91 @@ const userSchema = new mongoose.Schema({
   ownerDetails: {
     aadharNumber: {
       type: String,
-      required: [
-        function() { return this.role === 'owner'; },
-        'Aadhar number is required for owners'
-      ],
-      match: [/^\d{12}$/, 'Please enter a valid 12-digit Aadhar number']
+      validate: {
+        validator: function(v) {
+          if (this.role === 'owner') {
+            return v && /^\d{12}$/.test(v);
+          }
+          return true;
+        },
+        message: 'Valid 12-digit Aadhar number is required for owners'
+      }
     },
     panNumber: {
       type: String,
-      required: [
-        function() { return this.role === 'owner'; },
-        'PAN number is required for owners'
-      ],
-      match: [/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, 'Please enter a valid PAN number']
+      validate: {
+        validator: function(v) {
+          if (this.role === 'owner') {
+            return v && /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(v);
+          }
+          return true;
+        },
+        message: 'Valid PAN number is required for owners'
+      }
     },
-    businessName: {
+    vehicleRegistration: {
       type: String,
-      required: [
-        function() { return this.role === 'owner'; },
-        'Business name is required for owners'
-      ]
+      validate: {
+        validator: function(v) {
+          if (this.role === 'owner') {
+            return v && v.trim().length > 0;
+          }
+          return true;
+        },
+        message: 'Vehicle registration is required for owners'
+      }
     },
-    businessLicense: {
+    insuranceNumber: {
       type: String,
-      required: [
-        function() { return this.role === 'owner'; },
-        'Business license is required for owners'
-      ]
+      validate: {
+        validator: function(v) {
+          if (this.role === 'owner') {
+            return v && v.trim().length > 0;
+          }
+          return true;
+        },
+        message: 'Insurance number is required for owners'
+      }
+    },
+    insuranceExpiry: {
+      type: Date
     },
     bankDetails: {
       accountNumber: {
         type: String,
-        required: [
-          function() { return this.role === 'owner'; },
-          'Account number is required for owners'
-        ],
-        match: [/^\d{9,18}$/, 'Please enter a valid account number (9-18 digits)']
+        validate: {
+          validator: function(v) {
+            if (this.parent().parent().role === 'owner') {
+              return v && v.trim().length > 0;
+            }
+            return true;
+          },
+          message: 'Account number is required for owners'
+        }
       },
       ifscCode: {
         type: String,
-        required: [
-          function() { return this.role === 'owner'; },
-          'IFSC code is required for owners'
-        ],
-        match: [/^[A-Z]{4}0[A-Z0-9]{6}$/, 'Please enter a valid IFSC code']
+        validate: {
+          validator: function(v) {
+            if (this.parent().parent().role === 'owner') {
+              return v && /^[A-Z]{4}0[A-Z0-9]{6}$/.test(v);
+            }
+            return true;
+          },
+          message: 'Valid IFSC code is required for owners'
+        }
       },
       accountHolderName: {
         type: String,
-        required: [
-          function() { return this.role === 'owner'; },
-          'Account holder name is required for owners'
-        ]
+        validate: {
+          validator: function(v) {
+            if (this.parent().parent().role === 'owner') {
+              return v && v.trim().length > 0;
+            }
+            return true;
+          },
+          message: 'Account holder name is required for owners'
+        }
       }
     },
     rating: {
