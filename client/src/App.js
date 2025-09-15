@@ -21,7 +21,7 @@ const Wallet = lazy(() => import('./pages/Wallet'));
 const Support = lazy(() => import('./pages/Support'));
 const Earnings = lazy(() => import('./pages/Earnings'));
 const Login = lazy(() => import('./components/auth/SecureLoginForm'));
-const ProfileCompletion = lazy(() => import('./components/auth/ProfileCompletion'));
+const ProfileCompletion = lazy(() => import('./pages/ProfileCompletion'));
 const ForgotPassword = lazy(() => import('./pages/Auth/ForgotPassword'));
 const VehicleSearch = lazy(() => import('./pages/Vehicle/VehicleSearch'));
 const VehicleDetails = lazy(() => import('./pages/Vehicle/VehicleDetails'));
@@ -66,7 +66,9 @@ function App() {
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/vehicles" element={<VehicleSearch />} />
               <Route path="/vehicles/:id" element={<VehicleDetails />} />
-              <Route path="/profile" element={<Profile />} />
+              
+              {/* Protected Routes - Profile */}
+              <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
               <Route path="/privacy-policy" element={<PrivacyPolicy />} />
               <Route path="/terms-of-service" element={<TermsOfService />} />
               <Route path="/cookie-policy" element={<CookiePolicy />} />

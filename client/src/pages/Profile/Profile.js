@@ -5,7 +5,7 @@ import { showToast } from '../../components/CustomToast';
 import LocationAutocomplete from '../../components/LocationAutocomplete';
 
 const Profile = () => {
-  const { user, updateProfile: updateUserProfile } = useSecureAuth();
+  const { user, updateProfile: updateUserProfile, logout } = useSecureAuth();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -96,6 +96,22 @@ const Profile = () => {
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
+      
+      // Check if it's a 401 error (unauthorized)
+      if (error.response?.status === 401 || error.message?.includes('Invalid token')) {
+        showToast.error('Session expired. Please login again.');
+        // Show redirect notification
+        setTimeout(() => {
+          showToast.info('Redirecting to home page...');
+        }, 1000);
+        // Auto logout and redirect
+        await logout();
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 2000);
+        return;
+      }
+      
       showToast.error('Failed to load profile data');
     } finally {
       setInitialLoading(false);
@@ -181,7 +197,23 @@ const Profile = () => {
       } else if (!/^[0-9]{10}$/.test(value.replace(/\D/g, ''))) {
         newErrors.phone = 'Must be 10 digits';
       }
-
+    } else if (name === 'dateOfBirth' && value) {
+      const today = new Date();
+      const birthDate = new Date(value);
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      if (age < 16) {
+        newErrors.dateOfBirth = 'You must be at least 16 years old';
+      }
+    } else if (name === 'drivingLicense.expiryDate' && value) {
+      const today = new Date();
+      const expiryDate = new Date(value);
+      if (expiryDate <= today) {
+        newErrors.drivingLicenseExpiry = 'License expiry date must be in the future';
+      }
     } else if (name === 'ownerDetails.aadharNumber') {
       if (!value.trim()) newErrors.aadharNumber = 'Aadhar number is required';
       else if (!/^\d{12}$/.test(value)) newErrors.aadharNumber = 'Must be 12 digits';
@@ -287,6 +319,29 @@ const Profile = () => {
     // Driving license validation for all users
     if (!formData.drivingLicense.number.trim()) {
       newErrors.drivingLicense = 'Driving license number is required';
+    }
+    
+    // Date of birth validation
+    if (formData.dateOfBirth) {
+      const today = new Date();
+      const birthDate = new Date(formData.dateOfBirth);
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      if (age < 16) {
+        newErrors.dateOfBirth = 'You must be at least 16 years old';
+      }
+    }
+    
+    // License expiry validation
+    if (formData.drivingLicense.expiryDate) {
+      const today = new Date();
+      const expiryDate = new Date(formData.drivingLicense.expiryDate);
+      if (expiryDate <= today) {
+        newErrors.drivingLicenseExpiry = 'License expiry date must be in the future';
+      }
     }
     
     // Aadhar and PAN validation for all users
@@ -728,8 +783,11 @@ const Profile = () => {
                   value={formData.dateOfBirth}
                   onChange={handleInputChange}
                   disabled={!isEditing}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
+                    errors.dateOfBirth ? 'border-red-500' : 'border-gray-300'
+                  }`}
                 />
+                {errors.dateOfBirth && <p className="text-red-500 text-sm mt-1">{errors.dateOfBirth}</p>}
               </div>
               
               <div>
@@ -845,8 +903,11 @@ const Profile = () => {
                   value={formData.drivingLicense.expiryDate}
                   onChange={handleInputChange}
                   disabled={!isEditing}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50 ${
+                    errors.drivingLicenseExpiry ? 'border-red-500' : 'border-gray-300'
+                  }`}
                 />
+                {errors.drivingLicenseExpiry && <p className="text-red-500 text-sm mt-1">{errors.drivingLicenseExpiry}</p>}
               </div>
             </div>
           </div>

@@ -1,15 +1,21 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSecureAuth } from '../context/SecureAuthContext';
-import axios from 'axios';
+import { FaEye, FaEyeSlash, FaSpinner, FaCheckCircle } from 'react-icons/fa';
+import { showToast } from '../components/CustomToast';
 
 const ProfileCompletion = () => {
   const navigate = useNavigate();
-  const { user, updateProfile } = useSecureAuth();
-  const [loading, setLoading] = useState(false);
+  const { user, completeProfile, updateProfile, loading } = useSecureAuth();
+  
   const [formData, setFormData] = useState({
+    password: '',
+    confirmPassword: '',
+    phone: '',
+    bio: '',
+    role: 'customer',
+    // Customer fields
     dateOfBirth: '',
-    phone: user?.phone || '',
     address: {
       street: '',
       city: '',
@@ -20,309 +26,768 @@ const ProfileCompletion = () => {
       number: '',
       expiryDate: ''
     },
-    ownerDetails: user?.role === 'owner' ? {
+    // Owner fields
+    ownerDetails: {
       aadharNumber: '',
       panNumber: '',
       businessName: '',
+      businessLicense: '',
       bankDetails: {
         accountNumber: '',
         ifscCode: '',
         accountHolderName: ''
       }
-    } : null
+    }
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const validateForm = () => {
+    const errors = {};
+    
+    // Essential fields for all users
+    if (!formData.password) {
+      errors.password = 'Password is required';
+    } else if (formData.password.length < 8) {
+      errors.password = 'Password must be at least 8 characters long';
+    } else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/.test(formData.password)) {
+      errors.password = 'Password must contain uppercase, lowercase, number, and special character';
+    }
+    
+    if (!formData.confirmPassword) {
+      errors.confirmPassword = 'Please confirm your password';
+    } else if (formData.password !== formData.confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match';
+    }
+    
+    if (!formData.phone) {
+      errors.phone = 'Phone number is required';
+    } else if (!/^[6-9]\d{9}$/.test(formData.phone)) {
+      errors.phone = 'Please enter a valid 10-digit Indian phone number';
+    }
+    
+    if (!formData.dateOfBirth) {
+      errors.dateOfBirth = 'Date of birth is required';
+    } else {
+      const today = new Date();
+      const birthDate = new Date(formData.dateOfBirth);
+      const age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      if (age < 16) {
+        errors.dateOfBirth = 'You must be at least 16 years old';
+      }
+    }
+    
+    if (!formData.drivingLicense.number) {
+      errors.drivingLicense = 'Driving license is required';
+    }
+    
+    if (!formData.drivingLicense.expiryDate) {
+      errors.drivingLicenseExpiry = 'License expiry date is required';
+    } else {
+      const today = new Date();
+      const expiryDate = new Date(formData.drivingLicense.expiryDate);
+      if (expiryDate <= today) {
+        errors.drivingLicenseExpiry = 'License expiry date must be in the future';
+      }
+    }
+    
+    // Address validation
+    if (!formData.address.street) {
+      errors.street = 'Street address is required';
+    }
+    if (!formData.address.city) {
+      errors.city = 'City is required';
+    }
+    if (!formData.address.state) {
+      errors.state = 'State is required';
+    }
+    if (!formData.address.zipCode) {
+      errors.zipCode = 'ZIP code is required';
+    }
+    
+    if (!formData.ownerDetails.aadharNumber) {
+      errors.aadharNumber = 'Aadhar number is required';
+    } else if (!/^\d{12}$/.test(formData.ownerDetails.aadharNumber)) {
+      errors.aadharNumber = 'Please enter a valid 12-digit Aadhar number';
+    }
+    
+    if (!formData.ownerDetails.panNumber) {
+      errors.panNumber = 'PAN number is required';
+    } else if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(formData.ownerDetails.panNumber)) {
+      errors.panNumber = 'Please enter a valid PAN number';
+    }
+    
+    // Bio is optional - only validate length if provided
+    if (formData.bio && formData.bio.length > 500) {
+      errors.bio = 'Bio cannot exceed 500 characters';
+    }
+    
+    // Owner-specific required fields
+    if (formData.role === 'owner') {
+      if (!formData.ownerDetails.businessName) {
+        errors.businessName = 'Business name is required for owners';
+      }
+      
+      if (!formData.ownerDetails.bankDetails.accountNumber) {
+        errors.accountNumber = 'Account number is required for owners';
+      }
+      
+      if (!formData.ownerDetails.bankDetails.ifscCode) {
+        errors.ifscCode = 'IFSC code is required for owners';
+      }
+      
+      if (!formData.ownerDetails.bankDetails.accountHolderName) {
+        errors.accountHolderName = 'Account holder name is required for owners';
+      }
+    }
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+    
+    // Input formatting and validation
+    if (name === 'ownerDetails.aadharNumber') {
+      value = value.replace(/\D/g, '').slice(0, 12);
+    } else if (name === 'ownerDetails.panNumber') {
+      const cleaned = value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (cleaned.length <= 5) {
+        value = cleaned.replace(/[^A-Z]/g, '');
+      } else if (cleaned.length <= 9) {
+        value = cleaned.slice(0, 5).replace(/[^A-Z]/g, '') + cleaned.slice(5).replace(/[^0-9]/g, '');
+      } else {
+        value = cleaned.slice(0, 5).replace(/[^A-Z]/g, '') + cleaned.slice(5, 9).replace(/[^0-9]/g, '') + cleaned.slice(9, 10).replace(/[^A-Z]/g, '');
+      }
+      value = value.slice(0, 10);
+    } else if (name === 'ownerDetails.bankDetails.accountNumber') {
+      value = value.replace(/\D/g, '');
+    } else if (name === 'ownerDetails.bankDetails.ifscCode') {
+      value = value.toUpperCase();
+    } else if (name === 'ownerDetails.bankDetails.accountHolderName') {
+      value = value.toUpperCase();
+    } else if (name === 'phone') {
+      value = value.replace(/\D/g, '').slice(0, 10);
+    } else if (name === 'drivingLicense.number') {
+      value = value.toUpperCase();
+    }
     
     if (name.includes('.')) {
-      const [parent, child] = name.split('.');
+      const [parent, child, grandchild] = name.split('.');
       setFormData(prev => ({
         ...prev,
         [parent]: {
           ...prev[parent],
-          [child]: value
+          [child]: grandchild ? {
+            ...prev[parent][child],
+            [grandchild]: value
+          } : value
         }
       }));
     } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: value
-      }));
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
+    
+    // Clear field-specific errors
+    const fieldKey = name.split('.').pop();
+    if (formErrors[fieldKey]) {
+      setFormErrors(prev => ({ ...prev, [fieldKey]: '' }));
+    }
+    
+    // Also clear parent field errors
+    if (name.includes('address.') && formErrors[name.split('.')[1]]) {
+      setFormErrors(prev => ({ ...prev, [name.split('.')[1]]: '' }));
+    }
+    if (name.includes('ownerDetails.') && formErrors[name.split('.')[1]]) {
+      setFormErrors(prev => ({ ...prev, [name.split('.')[1]]: '' }));
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
-
+    
+    if (!validateForm()) return;
+    
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.put(
-        `${process.env.REACT_APP_API_URL}/auth/complete-profile`,
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      setIsSubmitting(true);
 
-      if (response.data.success) {
-        updateUser(response.data.data.user);
-        navigate('/dashboard');
+      // First complete profile with password
+      const completeData = {
+        password: formData.password,
+        phone: formData.phone
+      };
+      
+      // Only include bio if it has content
+      if (formData.bio && formData.bio.trim()) {
+        completeData.bio = formData.bio.trim();
+      }
+      
+      const completeResponse = await completeProfile(completeData);
+      
+      if (completeResponse.success) {
+        // Prepare profile data with proper structure
+        const profileUpdateData = {
+          role: formData.role,
+          dateOfBirth: formData.dateOfBirth,
+          address: {
+            street: formData.address.street,
+            city: formData.address.city,
+            state: formData.address.state,
+            zipCode: formData.address.zipCode,
+            country: 'India'
+          },
+          drivingLicense: {
+            number: formData.drivingLicense.number,
+            expiryDate: formData.drivingLicense.expiryDate
+          },
+          personalDetails: {
+            aadharNumber: formData.ownerDetails.aadharNumber,
+            panNumber: formData.ownerDetails.panNumber
+          }
+        };
+        
+        // Add owner-specific details if role is owner
+        if (formData.role === 'owner') {
+          profileUpdateData.ownerDetails = {
+            aadharNumber: formData.ownerDetails.aadharNumber,
+            panNumber: formData.ownerDetails.panNumber,
+            businessName: formData.ownerDetails.businessName,
+            bankDetails: {
+              accountNumber: formData.ownerDetails.bankDetails.accountNumber,
+              ifscCode: formData.ownerDetails.bankDetails.ifscCode,
+              accountHolderName: formData.ownerDetails.bankDetails.accountHolderName
+            }
+          };
+        }
+        
+        console.log('Updating profile with structured data:', profileUpdateData);
+        
+        const updateResponse = await updateProfile(profileUpdateData);
+        
+        console.log('Update response:', updateResponse);
+        
+        if (updateResponse.success) {
+          showToast.success('Profile completed successfully!');
+          navigate('/');
+        } else {
+          console.error('Update profile failed:', updateResponse);
+          showToast.error(updateResponse.message || 'Failed to save profile data');
+        }
+      } else {
+        console.error('Complete profile failed:', completeResponse);
+        showToast.error(completeResponse.message || 'Failed to complete profile');
       }
     } catch (error) {
-      console.error('Profile completion failed:', error);
-      alert(error.response?.data?.message || 'Failed to complete profile');
+      console.error('Profile completion error:', error);
+      if (error.response?.data?.message) {
+        showToast.error(error.response.data.message);
+      } else if (error.message) {
+        showToast.error(error.message);
+      } else {
+        showToast.error('Failed to complete profile. Please try again.');
+      }
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
+  if (!user || user.isProfileComplete) {
+    navigate('/');
+    return null;
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          Complete Your Profile
-        </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          Please fill in the required information to continue
-        </p>
-      </div>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        <div>
+          <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-green-100">
+            <FaCheckCircle className="h-8 w-8 text-green-600" />
+          </div>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+            Complete Your Profile
+          </h2>
+          <p className="mt-2 text-center text-sm text-gray-600">
+            Welcome, {user?.firstName}! Complete the required fields to start using RentRider.
+          </p>
+          <div className="mt-4 bg-amber-50 border border-amber-200 rounded-md p-3">
+            <p className="text-xs text-amber-800 text-center">
+              ⚡ Fields marked with * are required for account verification and security
+            </p>
+          </div>
+        </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            {/* Basic Information */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Date of Birth
-              </label>
-              <input
-                type="date"
-                name="dateOfBirth"
-                value={formData.dateOfBirth}
-                onChange={handleInputChange}
-                required
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Phone Number
-              </label>
-              <input
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={handleInputChange}
-                required
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            {/* Address */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium text-gray-900">Address</h3>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Street Address
-                </label>
-                <input
-                  type="text"
-                  name="address.street"
-                  value={formData.address.street}
-                  onChange={handleInputChange}
-                  required
-                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+        <div className="mt-8 space-y-6">
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+            <div className="flex items-center">
+              {user?.photoURL && (
+                <img
+                  src={user.photoURL}
+                  alt="Profile"
+                  className="h-10 w-10 rounded-full mr-3"
                 />
+              )}
+              <div>
+                <p className="text-sm font-medium text-blue-900">{user?.fullName}</p>
+                <p className="text-sm text-blue-700">{user?.email}</p>
+              </div>
+            </div>
+          </div>
+
+          <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+            <div className="space-y-4">
+              {/* Role Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  I want to use RentRider as: *
+                </label>
+                <div className="grid grid-cols-2 gap-4">
+                  <label className={`relative flex cursor-pointer rounded-lg border p-4 focus:outline-none ${
+                    formData.role === 'customer' ? 'border-blue-600 bg-blue-50' : 'border-gray-300'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="role"
+                      value="customer"
+                      checked={formData.role === 'customer'}
+                      onChange={handleInputChange}
+                      className="sr-only"
+                    />
+                    <div className="flex flex-col">
+                      <span className="block text-sm font-medium text-gray-900">Customer</span>
+                      <span className="block text-sm text-gray-500">Rent bikes from owners</span>
+                    </div>
+                  </label>
+                  
+                  <label className={`relative flex cursor-pointer rounded-lg border p-4 focus:outline-none ${
+                    formData.role === 'owner' ? 'border-blue-600 bg-blue-50' : 'border-gray-300'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="role"
+                      value="owner"
+                      checked={formData.role === 'owner'}
+                      onChange={handleInputChange}
+                      className="sr-only"
+                    />
+                    <div className="flex flex-col">
+                      <span className="block text-sm font-medium text-gray-900">Owner</span>
+                      <span className="block text-sm text-gray-500">List bikes for rent</span>
+                    </div>
+                  </label>
+                </div>
               </div>
 
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                  Create Password *
+                </label>
+                <div className="mt-1 relative">
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    className={`appearance-none relative block w-full px-3 py-2 pr-10 border ${
+                      formErrors.password ? 'border-red-300' : 'border-gray-300'
+                    } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                    placeholder="Create a strong password"
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <FaEyeSlash className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <FaEye className="h-4 w-4 text-gray-400" />
+                    )}
+                  </button>
+                </div>
+                {formErrors.password && (
+                  <p className="mt-1 text-sm text-red-600">{formErrors.password}</p>
+                )}
+                <p className="mt-1 text-xs text-gray-500">
+                  Must contain uppercase, lowercase, number, and special character
+                </p>
+              </div>
+
+              <div>
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+                  Confirm Password *
+                </label>
+                <div className="mt-1 relative">
+                  <input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={formData.confirmPassword}
+                    onChange={handleInputChange}
+                    className={`appearance-none relative block w-full px-3 py-2 pr-10 border ${
+                      formErrors.confirmPassword ? 'border-red-300' : 'border-gray-300'
+                    } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                    placeholder="Confirm your password"
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  >
+                    {showConfirmPassword ? (
+                      <FaEyeSlash className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <FaEye className="h-4 w-4 text-gray-400" />
+                    )}
+                  </button>
+                </div>
+                {formErrors.confirmPassword && (
+                  <p className="mt-1 text-sm text-red-600">{formErrors.confirmPassword}</p>
+                )}
+              </div>
+
+              <div>
+                <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
+                  Phone Number *
+                </label>
+                <input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  value={formData.phone}
+                  onChange={handleInputChange}
+                  className={`mt-1 appearance-none relative block w-full px-3 py-2 border ${
+                    formErrors.phone ? 'border-red-300' : 'border-gray-300'
+                  } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                  placeholder="10-digit phone number"
+                />
+                {formErrors.phone && (
+                  <p className="mt-1 text-sm text-red-600">{formErrors.phone}</p>
+                )}
+              </div>
+
+              {/* Common Fields */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    City
+                  <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-700">
+                    Date of Birth *
                   </label>
                   <input
-                    type="text"
-                    name="address.city"
-                    value={formData.address.city}
+                    id="dateOfBirth"
+                    name="dateOfBirth"
+                    type="date"
+                    value={formData.dateOfBirth}
                     onChange={handleInputChange}
                     required
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className={`mt-1 block w-full px-3 py-2 border ${
+                      formErrors.dateOfBirth ? 'border-red-300' : 'border-gray-300'
+                    } rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
                   />
+                  {formErrors.dateOfBirth && (
+                    <p className="mt-1 text-sm text-red-600">{formErrors.dateOfBirth}</p>
+                  )}
                 </div>
-
+                
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    State
+                  <label htmlFor="drivingLicense.expiryDate" className="block text-sm font-medium text-gray-700">
+                    License Expiry *
                   </label>
                   <input
-                    type="text"
-                    name="address.state"
-                    value={formData.address.state}
+                    id="drivingLicense.expiryDate"
+                    name="drivingLicense.expiryDate"
+                    type="date"
+                    value={formData.drivingLicense.expiryDate}
                     onChange={handleInputChange}
                     required
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className={`mt-1 block w-full px-3 py-2 border ${
+                      formErrors.drivingLicenseExpiry ? 'border-red-300' : 'border-gray-300'
+                    } rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
                   />
+                  {formErrors.drivingLicenseExpiry && (
+                    <p className="mt-1 text-sm text-red-600">{formErrors.drivingLicenseExpiry}</p>
+                  )}
                 </div>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  ZIP Code
-                </label>
-                <input
-                  type="text"
-                  name="address.zipCode"
-                  value={formData.address.zipCode}
-                  onChange={handleInputChange}
-                  required
-                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-            </div>
-
-            {/* Driving License */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium text-gray-900">Driving License</h3>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  License Number
+                <label htmlFor="drivingLicense.number" className="block text-sm font-medium text-gray-700">
+                  Driving License Number *
                 </label>
                 <input
-                  type="text"
+                  id="drivingLicense.number"
                   name="drivingLicense.number"
+                  type="text"
                   value={formData.drivingLicense.number}
                   onChange={handleInputChange}
                   required
-                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className={`mt-1 block w-full px-3 py-2 border ${
+                    formErrors.drivingLicense ? 'border-red-300' : 'border-gray-300'
+                  } rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                  placeholder="MH1420110012345"
                 />
+                {formErrors.drivingLicense && (
+                  <p className="mt-1 text-sm text-red-600">{formErrors.drivingLicense}</p>
+                )}
               </div>
 
+              {/* Address Fields */}
               <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Expiry Date
-                </label>
-                <input
-                  type="date"
-                  name="drivingLicense.expiryDate"
-                  value={formData.drivingLicense.expiryDate}
-                  onChange={handleInputChange}
-                  required
-                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                />
+                <label className="block text-sm font-medium text-gray-700 mb-2">Address *</label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <input
+                      name="address.street"
+                      type="text"
+                      value={formData.address.street}
+                      onChange={handleInputChange}
+                      required
+                      className={`block w-full px-3 py-2 border ${
+                        formErrors.street ? 'border-red-300' : 'border-gray-300'
+                      } rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                      placeholder="Street Address *"
+                    />
+                    {formErrors.street && (
+                      <p className="mt-1 text-xs text-red-600">{formErrors.street}</p>
+                    )}
+                  </div>
+                  <div>
+                    <input
+                      name="address.city"
+                      type="text"
+                      value={formData.address.city}
+                      onChange={handleInputChange}
+                      required
+                      className={`block w-full px-3 py-2 border ${
+                        formErrors.city ? 'border-red-300' : 'border-gray-300'
+                      } rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                      placeholder="City *"
+                    />
+                    {formErrors.city && (
+                      <p className="mt-1 text-xs text-red-600">{formErrors.city}</p>
+                    )}
+                  </div>
+                  <div>
+                    <input
+                      name="address.state"
+                      type="text"
+                      value={formData.address.state}
+                      onChange={handleInputChange}
+                      required
+                      className={`block w-full px-3 py-2 border ${
+                        formErrors.state ? 'border-red-300' : 'border-gray-300'
+                      } rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                      placeholder="State *"
+                    />
+                    {formErrors.state && (
+                      <p className="mt-1 text-xs text-red-600">{formErrors.state}</p>
+                    )}
+                  </div>
+                  <div>
+                    <input
+                      name="address.zipCode"
+                      type="text"
+                      value={formData.address.zipCode}
+                      onChange={handleInputChange}
+                      required
+                      className={`block w-full px-3 py-2 border ${
+                        formErrors.zipCode ? 'border-red-300' : 'border-gray-300'
+                      } rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                      placeholder="ZIP Code *"
+                    />
+                    {formErrors.zipCode && (
+                      <p className="mt-1 text-xs text-red-600">{formErrors.zipCode}</p>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
 
-            {/* Owner Details */}
-            {user?.role === 'owner' && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium text-gray-900">Owner Details</h3>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Aadhar Number
-                  </label>
-                  <input
-                    type="text"
-                    name="ownerDetails.aadharNumber"
-                    value={formData.ownerDetails?.aadharNumber || ''}
-                    onChange={handleInputChange}
-                    required
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    PAN Number
-                  </label>
-                  <input
-                    type="text"
-                    name="ownerDetails.panNumber"
-                    value={formData.ownerDetails?.panNumber || ''}
-                    onChange={handleInputChange}
-                    required
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Business Name
-                  </label>
-                  <input
-                    type="text"
-                    name="ownerDetails.businessName"
-                    value={formData.ownerDetails?.businessName || ''}
-                    onChange={handleInputChange}
-                    required
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="text-md font-medium text-gray-800">Bank Details</h4>
+              {/* Identity Documents - Required for all users */}
+              <div className="space-y-4 border-t pt-4">
+                <h3 className="text-lg font-medium text-gray-900">Identity Documents</h3>
+                <p className="text-sm text-gray-600">Required for verification and security</p>
+                  
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="aadharNumber" className="block text-sm font-medium text-gray-700">
+                      Aadhar Number *
+                    </label>
+                    <input
+                      id="aadharNumber"
+                      name="ownerDetails.aadharNumber"
+                      type="text"
+                      value={formData.ownerDetails.aadharNumber}
+                      onChange={handleInputChange}
+                      required
+                      className={`mt-1 block w-full px-3 py-2 border ${
+                        formErrors.aadharNumber ? 'border-red-300' : 'border-gray-300'
+                      } rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                      placeholder="123456789012"
+                      maxLength="12"
+                    />
+                    {formErrors.aadharNumber && (
+                      <p className="mt-1 text-sm text-red-600">{formErrors.aadharNumber}</p>
+                    )}
+                  </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Account Number
+                    <label htmlFor="panNumber" className="block text-sm font-medium text-gray-700">
+                      PAN Number *
                     </label>
                     <input
+                      id="panNumber"
+                      name="ownerDetails.panNumber"
                       type="text"
-                      name="ownerDetails.bankDetails.accountNumber"
-                      value={formData.ownerDetails?.bankDetails?.accountNumber || ''}
+                      value={formData.ownerDetails.panNumber}
                       onChange={handleInputChange}
                       required
-                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      className={`mt-1 block w-full px-3 py-2 border ${
+                        formErrors.panNumber ? 'border-red-300' : 'border-gray-300'
+                      } rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                      placeholder="ABCDE1234F"
+                      maxLength="10"
+                      style={{ textTransform: 'uppercase' }}
                     />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      IFSC Code
-                    </label>
-                    <input
-                      type="text"
-                      name="ownerDetails.bankDetails.ifscCode"
-                      value={formData.ownerDetails?.bankDetails?.ifscCode || ''}
-                      onChange={handleInputChange}
-                      required
-                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      Account Holder Name
-                    </label>
-                    <input
-                      type="text"
-                      name="ownerDetails.bankDetails.accountHolderName"
-                      value={formData.ownerDetails?.bankDetails?.accountHolderName || ''}
-                      onChange={handleInputChange}
-                      required
-                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    />
+                    {formErrors.panNumber && (
+                      <p className="mt-1 text-sm text-red-600">{formErrors.panNumber}</p>
+                    )}
                   </div>
                 </div>
               </div>
-            )}
+
+              {/* Owner-specific fields */}
+              {formData.role === 'owner' && (
+                <div className="space-y-4 border-t pt-4">
+                  <h3 className="text-lg font-medium text-gray-900">Business Details</h3>
+                  <p className="text-sm text-gray-600">Required for vehicle owners to receive payments</p>
+                  
+                  <div>
+                    <label htmlFor="businessName" className="block text-sm font-medium text-gray-700">
+                      Business/Individual Name *
+                    </label>
+                    <input
+                      id="businessName"
+                      name="ownerDetails.businessName"
+                      type="text"
+                      value={formData.ownerDetails.businessName}
+                      onChange={handleInputChange}
+                      required
+                      className={`mt-1 block w-full px-3 py-2 border ${
+                        formErrors.businessName ? 'border-red-300' : 'border-gray-300'
+                      } rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                      placeholder="Business name or your full name"
+                    />
+                    {formErrors.businessName && (
+                      <p className="mt-1 text-sm text-red-600">{formErrors.businessName}</p>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Bank Details *</label>
+                    <p className="text-xs text-gray-500 mb-3">For receiving rental payments securely</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <input
+                          name="ownerDetails.bankDetails.accountNumber"
+                          type="text"
+                          value={formData.ownerDetails.bankDetails.accountNumber}
+                          onChange={handleInputChange}
+                          required
+                          className={`block w-full px-3 py-2 border ${
+                            formErrors.accountNumber ? 'border-red-300' : 'border-gray-300'
+                          } rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                          placeholder="Account Number *"
+                        />
+                        {formErrors.accountNumber && (
+                          <p className="mt-1 text-xs text-red-600">{formErrors.accountNumber}</p>
+                        )}
+                      </div>
+                      <div>
+                        <input
+                          name="ownerDetails.bankDetails.ifscCode"
+                          type="text"
+                          value={formData.ownerDetails.bankDetails.ifscCode}
+                          onChange={handleInputChange}
+                          required
+                          className={`block w-full px-3 py-2 border ${
+                            formErrors.ifscCode ? 'border-red-300' : 'border-gray-300'
+                          } rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                          placeholder="IFSC Code *"
+                          style={{ textTransform: 'uppercase' }}
+                        />
+                        {formErrors.ifscCode && (
+                          <p className="mt-1 text-xs text-red-600">{formErrors.ifscCode}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-2">
+                      <input
+                        name="ownerDetails.bankDetails.accountHolderName"
+                        type="text"
+                        value={formData.ownerDetails.bankDetails.accountHolderName}
+                        onChange={handleInputChange}
+                        required
+                        className={`block w-full px-3 py-2 border ${
+                          formErrors.accountHolderName ? 'border-red-300' : 'border-gray-300'
+                        } rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                        placeholder="Account Holder Name *"
+                      />
+                      {formErrors.accountHolderName && (
+                        <p className="mt-1 text-xs text-red-600">{formErrors.accountHolderName}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="bio" className="block text-sm font-medium text-gray-700">
+                  Bio (Optional)
+                </label>
+                <textarea
+                  id="bio"
+                  name="bio"
+                  rows={3}
+                  value={formData.bio}
+                  onChange={handleInputChange}
+                  className={`mt-1 appearance-none relative block w-full px-3 py-2 border ${
+                    formErrors.bio ? 'border-red-300' : 'border-gray-300'
+                  } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                  placeholder="Tell us about yourself..."
+                />
+                {formErrors.bio && (
+                  <p className="mt-1 text-sm text-red-600">{formErrors.bio}</p>
+                )}
+                <p className="mt-1 text-xs text-gray-500">
+                  {formData.bio.length}/500 characters
+                </p>
+              </div>
+            </div>
 
             <div>
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                disabled={isSubmitting || loading}
+                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {loading ? 'Completing...' : 'Complete Profile'}
+                {isSubmitting ? (
+                  <FaSpinner className="h-4 w-4 animate-spin" />
+                ) : (
+                  'Complete Profile'
+                )}
               </button>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+              <p className="text-xs text-blue-800 text-center">
+                🔒 All information is encrypted and secure. You can update optional details later in your profile.
+              </p>
             </div>
           </form>
         </div>
