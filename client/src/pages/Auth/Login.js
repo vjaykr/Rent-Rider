@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import { showToast } from '../../components/CustomToast';
 import { useSecureAuth } from '../../context/SecureAuthContext';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import FirebaseAuthButtons from '../../components/FirebaseAuthButtons';

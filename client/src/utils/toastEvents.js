@@ -10,10 +10,10 @@ class ToastEventManager {
 
 // Minimal essential toast events
 export const appToastEvents = {
-  success: (message) => showToast.success(message),
-  error: (message) => showToast.error(message),
-  warning: (message) => showToast.warning(message),
-  info: (message) => showToast.info(message)
+  success: (message) => showToast.success(message, { duration: 2000 }),
+  error: (message) => showToast.error(message, { duration: 2000 }),
+  warning: (message) => showToast.warning(message, { duration: 2000 }),
+  info: (message) => showToast.info(message, { duration: 2000 })
 };
 
 // Initialize minimal toast manager

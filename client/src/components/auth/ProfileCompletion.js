@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSecureAuth } from '../../context/SecureAuthContext';
 import { FaEye, FaEyeSlash, FaSpinner, FaCheckCircle } from 'react-icons/fa';
-import toast from 'react-hot-toast';
+import { showToast } from '../CustomToast';
 
 const ProfileCompletion = () => {
   const navigate = useNavigate();
@@ -157,17 +157,17 @@ const ProfileCompletion = () => {
       const response = await completeProfile(profileData);
       
       if (response.success) {
-        toast.success('Profile completed successfully!');
+        showToast.success('Profile completed successfully!');
         navigate('/');
       } else {
-        toast.error(response.message || 'Failed to complete profile');
+        showToast.error(response.message || 'Failed to complete profile');
       }
     } catch (error) {
       console.error('Profile completion error:', error);
       if (error.code === 'auth/weak-password') {
-        toast.error('Password is too weak. Please choose a stronger password.');
+        showToast.error('Password is too weak. Please choose a stronger password.');
       } else {
-        toast.error('Failed to complete profile. Please try again.');
+        showToast.error('Failed to complete profile. Please try again.');
       }
     } finally {
       setIsSubmitting(false);

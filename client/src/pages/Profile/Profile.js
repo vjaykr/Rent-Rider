@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSecureAuth } from '../../context/SecureAuthContext';
 import { secureAuthService } from '../../services/secureAuthService';
-import toast from 'react-hot-toast';
+import { showToast } from '../../components/CustomToast';
 
 const Profile = () => {
   const { user } = useSecureAuth();
@@ -89,7 +89,7 @@ const Profile = () => {
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
-      toast.error('Failed to load profile data');
+      showToast.error('Failed to load profile data');
     } finally {
       setInitialLoading(false);
     }
@@ -146,7 +146,7 @@ const Profile = () => {
     e.preventDefault();
     
     if (!validateForm()) {
-      toast.error('Please fix the errors before submitting');
+      showToast.error('Please fix the errors before submitting');
       return;
     }
     
@@ -177,13 +177,13 @@ const Profile = () => {
         setIsEditing(false);
         setErrors({});
         await fetchProfile();
-        toast.success('Profile updated successfully!');
+        showToast.success('Profile updated successfully!');
       } else {
-        toast.error(response.message || 'Failed to update profile');
+        showToast.error(response.message || 'Failed to update profile');
       }
     } catch (error) {
       console.error('Profile update error:', error);
-      toast.error(error.message || 'Error updating profile. Please try again.');
+      showToast.error(error.message || 'Error updating profile. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -220,7 +220,7 @@ const Profile = () => {
 
   const handleChangePassword = async () => {
     if (!validatePasswordChange()) {
-      toast.error('Please fix the errors before submitting');
+      showToast.error('Please fix the errors before submitting');
       return;
     }
     
@@ -233,16 +233,16 @@ const Profile = () => {
       );
       
       if (response.success) {
-        toast.success('Password changed successfully!');
+        showToast.success('Password changed successfully!');
         setShowChangePassword(false);
         setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
         setPasswordErrors({});
       } else {
-        toast.error(response.message || 'Failed to change password');
+        showToast.error(response.message || 'Failed to change password');
       }
     } catch (error) {
       console.error('Password change error:', error);
-      toast.error(error.message || 'Failed to change password');
+      showToast.error(error.message || 'Failed to change password');
     } finally {
       setLoading(false);
     }

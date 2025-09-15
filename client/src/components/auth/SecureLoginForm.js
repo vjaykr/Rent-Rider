@@ -4,7 +4,7 @@ import { useSecureAuth } from '../../context/SecureAuthContext';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { auth } from '../../config/firebase';
 import { FaGoogle, FaEye, FaEyeSlash, FaSpinner, FaExclamationTriangle } from 'react-icons/fa';
-import toast from 'react-hot-toast';
+import { showToast } from '../CustomToast';
 
 const SecureLoginForm = () => {
   const navigate = useNavigate();
@@ -66,23 +66,23 @@ const SecureLoginForm = () => {
       
       if (response.success) {
         if (response.requiresProfileCompletion) {
-          toast.success('Welcome! Please complete your profile.');
+          showToast.success('Welcome! Please complete your profile.');
           navigate('/profile-completion');
         } else {
-          toast.success('Successfully signed in!');
+          showToast.success('Successfully signed in!');
           navigate(from, { replace: true });
         }
       } else {
-        toast.error(response.message || 'Google authentication failed');
+        showToast.error(response.message || 'Google authentication failed');
       }
     } catch (error) {
       console.error('Google auth error:', error);
       if (error.code === 'auth/popup-closed-by-user') {
-        toast.error('Sign-in was cancelled');
+        showToast.error('Sign-in was cancelled');
       } else if (error.code === 'auth/popup-blocked') {
-        toast.error('Popup was blocked. Please allow popups and try again.');
+        showToast.error('Popup was blocked. Please allow popups and try again.');
       } else {
-        toast.error('Google authentication failed. Please try again.');
+        showToast.error('Google authentication failed. Please try again.');
       }
     } finally {
       setIsSubmitting(false);
@@ -102,14 +102,14 @@ const SecureLoginForm = () => {
       const response = await signInWithEmail(formData.email, formData.password);
       
       if (response.success) {
-        toast.success('Successfully signed in!');
+        showToast.success('Successfully signed in!');
         navigate(from, { replace: true });
       } else {
-        toast.error(response.message || 'Login failed');
+        showToast.error(response.message || 'Login failed');
       }
     } catch (error) {
       console.error('Email login error:', error);
-      toast.error(error.message || 'Login failed. Please try again.');
+      showToast.error(error.message || 'Login failed. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

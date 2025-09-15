@@ -19,7 +19,7 @@ const SimpleToast = ({ t, message, type = 'default' }) => {
   };
 
   const getStyles = () => {
-    const baseStyles = 'flex items-center justify-between w-full max-w-sm p-3 rounded-lg shadow-lg border transition-all duration-200';
+    const baseStyles = 'flex items-center justify-between w-auto max-w-xs p-2 rounded-lg shadow-lg border transition-all duration-150';
     
     switch (type) {
       case 'success':
@@ -39,22 +39,12 @@ const SimpleToast = ({ t, message, type = 'default' }) => {
     <div 
       className={`${getStyles()} cursor-pointer`}
       onClick={() => toast.dismiss(t.id)}
+      onMouseEnter={() => toast.dismiss(t.id)}
     >
-      <div className="flex items-center space-x-2">
-        <span className="text-sm">{getIcon()}</span>
-        <span className="text-sm font-medium">{message}</span>
+      <div className="flex items-center space-x-1">
+        <span className="text-xs">{getIcon()}</span>
+        <span className="text-xs font-medium whitespace-nowrap">{message}</span>
       </div>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          toast.dismiss(t.id);
-        }}
-        className="ml-2 p-1 rounded hover:bg-white/20 transition-colors"
-      >
-        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
     </div>
   );
 };
@@ -65,7 +55,7 @@ export const showToast = {
     return toast.custom((t) => (
       <SimpleToast t={t} message={message} type="success" />
     ), {
-      duration: options.duration || 1500,
+      duration: 2000,
       position: 'top-right',
       ...options
     });
@@ -75,7 +65,7 @@ export const showToast = {
     return toast.custom((t) => (
       <SimpleToast t={t} message={message} type="error" />
     ), {
-      duration: options.duration || 3000,
+      duration: 2000,
       position: 'top-right',
       ...options
     });
@@ -95,7 +85,7 @@ export const showToast = {
     return toast.custom((t) => (
       <SimpleToast t={t} message={message} type="warning" />
     ), {
-      duration: options.duration || 2000,
+      duration: 2000,
       position: 'top-right',
       ...options
     });
@@ -105,7 +95,7 @@ export const showToast = {
     return toast.custom((t) => (
       <SimpleToast t={t} message={message} type="default" />
     ), {
-      duration: options.duration || 1500,
+      duration: 2000,
       position: 'top-right',
       ...options
     });
@@ -121,15 +111,16 @@ export const EnhancedToaster = () => (
     containerStyle={{
       top: 20,
       right: 20,
-      left: 20,
       zIndex: 9999
     }}
     toastOptions={{
+      duration: 2000,
       style: {
         background: 'transparent',
         boxShadow: 'none',
         padding: 0,
-        maxWidth: '100%'
+        maxWidth: 'fit-content',
+        minWidth: 'auto'
       }
     }}
   />

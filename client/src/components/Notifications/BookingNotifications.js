@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { toast } from 'react-hot-toast';
+import { showToast } from '../CustomToast';
 import { ownerService } from '../../services/ownerService';
 
 const BookingNotifications = () => {
@@ -16,7 +16,7 @@ const BookingNotifications = () => {
       }
     } catch (error) {
       console.error('Error fetching notifications:', error);
-      toast.error('Failed to load notifications');
+      showToast.error('Failed to load notifications');
     } finally {
       setLoading(false);
     }
@@ -26,12 +26,12 @@ const BookingNotifications = () => {
     try {
       const response = await ownerService.updateBookingStatus(bookingId, status);
       if (response.success) {
-        toast.success(`Booking ${status} successfully`);
+        showToast.success(`Booking ${status} successfully`);
         fetchNotifications(); // Refresh notifications
       }
     } catch (error) {
       console.error('Error updating booking status:', error);
-      toast.error(`Failed to ${status} booking`);
+      showToast.error(`Failed to ${status} booking`);
     }
   };
 

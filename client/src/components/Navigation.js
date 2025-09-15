@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useSecureAuth } from '../context/SecureAuthContext';
 import { useDebounce } from '../hooks/useDebounce';
+
 import '../styles/animations.css';
 
 // Icon Component

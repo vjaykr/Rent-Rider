@@ -2,7 +2,6 @@ import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { secureAuthService } from '../services/secureAuthService';
 import { auth, onAuthStateChange } from '../config/firebase';
 import { showToast } from '../components/CustomToast';
-import toast from 'react-hot-toast';
 
 // Initial state
 const initialState = {
@@ -283,13 +282,7 @@ export const SecureAuthProvider = ({ children }) => {
         console.error('Firebase signout error:', firebaseError);
       }
       
-      toast.success('Logged out', {
-        duration: 2000,
-        style: {
-          fontSize: '14px',
-          padding: '8px 12px'
-        }
-      });
+      showToast.success('Signed out');
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
