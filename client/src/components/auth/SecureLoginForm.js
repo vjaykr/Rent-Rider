@@ -98,9 +98,7 @@ const SecureLoginForm = () => {
       setIsSubmitting(true);
       clearError();
 
-      const { signInWithEmailAndPassword } = await import('firebase/auth');
-      const firebaseResult = await signInWithEmailAndPassword(auth, formData.email, formData.password);
-      
+      // Use only backend authentication, not Firebase
       const response = await signInWithEmail(formData.email, formData.password);
       
       if (response.success) {
@@ -111,13 +109,7 @@ const SecureLoginForm = () => {
       }
     } catch (error) {
       console.error('Email login error:', error);
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-        toast.error('Invalid email or password');
-      } else if (error.code === 'auth/too-many-requests') {
-        toast.error('Too many failed attempts. Please try again later.');
-      } else {
-        toast.error('Login failed. Please try again.');
-      }
+      toast.error(error.message || 'Login failed. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

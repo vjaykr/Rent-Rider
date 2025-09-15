@@ -6,6 +6,7 @@ const {
   emailLogin,
   getCurrentUser,
   updateProfile,
+  changePassword,
   logout
 } = require('../controllers/secureAuthController');
 const {
@@ -23,6 +24,7 @@ router.post('/email-login', strictAuthLimiter, emailLogin);
 router.post('/complete-profile', authenticateUser, completeProfile);
 router.get('/me', authenticateUser, getCurrentUser);
 router.put('/profile', authenticateUser, updateProfile);
+router.put('/change-password', authenticateUser, changePassword);
 router.post('/logout', authenticateUser, logout);
 
 module.exports = router;

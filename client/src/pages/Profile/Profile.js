@@ -11,6 +11,7 @@ const Profile = () => {
     email: '',
     phone: '',
     dateOfBirth: '',
+    role: 'customer',
     address: {
       street: '',
       city: '',
@@ -21,6 +22,17 @@ const Profile = () => {
     drivingLicense: {
       number: '',
       expiryDate: ''
+    },
+    ownerDetails: {
+      aadharNumber: '',
+      panNumber: '',
+      businessName: '',
+      businessLicense: '',
+      bankDetails: {
+        accountNumber: '',
+        ifscCode: '',
+        accountHolderName: ''
+      }
     }
   });
   const [isEditing, setIsEditing] = useState(false);
@@ -28,6 +40,13 @@ const Profile = () => {
   const [initialLoading, setInitialLoading] = useState(true);
   const [profileData, setProfileData] = useState(null);
   const [errors, setErrors] = useState({});
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [passwordErrors, setPasswordErrors] = useState({});
 
   // Fetch complete profile data from database
   const fetchProfile = async () => {
@@ -43,6 +62,7 @@ const Profile = () => {
           email: userData.email || '',
           phone: userData.phone || '',
           dateOfBirth: userData.dateOfBirth ? new Date(userData.dateOfBirth).toISOString().split('T')[0] : '',
+          role: userData.role || 'customer',
           address: {
             street: userData.address?.street || '',
             city: userData.address?.city || '',
@@ -53,6 +73,17 @@ const Profile = () => {
           drivingLicense: {
             number: userData.drivingLicense?.number || '',
             expiryDate: userData.drivingLicense?.expiryDate ? new Date(userData.drivingLicense.expiryDate).toISOString().split('T')[0] : ''
+          },
+          ownerDetails: {
+            aadharNumber: userData.ownerDetails?.aadharNumber || '',
+            panNumber: userData.ownerDetails?.panNumber || '',
+            businessName: userData.ownerDetails?.businessName || '',
+            businessLicense: userData.ownerDetails?.businessLicense || '',
+            bankDetails: {
+              accountNumber: userData.ownerDetails?.bankDetails?.accountNumber || '',
+              ifscCode: userData.ownerDetails?.bankDetails?.ifscCode || '',
+              accountHolderName: userData.ownerDetails?.bankDetails?.accountHolderName || ''
+            }
           }
         });
       }
@@ -158,6 +189,65 @@ const Profile = () => {
     }
   };
 
+  const validatePasswordChange = () => {
+    const errors = {};
+    
+    if (!passwordData.currentPassword) {
+      errors.currentPassword = 'Current password is required';
+    }
+    
+    if (!passwordData.newPassword) {
+      errors.newPassword = 'New password is required';
+    } else if (passwordData.newPassword.length < 8) {
+      errors.newPassword = 'Password must be at least 8 characters long';
+    } else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/.test(passwordData.newPassword)) {
+      errors.newPassword = 'Password must contain uppercase, lowercase, number, and special character';
+    }
+    
+    if (!passwordData.confirmPassword) {
+      errors.confirmPassword = 'Please confirm your new password';
+    } else if (passwordData.newPassword !== passwordData.confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match';
+    }
+    
+    if (passwordData.currentPassword === passwordData.newPassword) {
+      errors.newPassword = 'New password must be different from current password';
+    }
+    
+    setPasswordErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleChangePassword = async () => {
+    if (!validatePasswordChange()) {
+      toast.error('Please fix the errors before submitting');
+      return;
+    }
+    
+    setLoading(true);
+    
+    try {
+      const response = await secureAuthService.changePassword(
+        passwordData.currentPassword,
+        passwordData.newPassword
+      );
+      
+      if (response.success) {
+        toast.success('Password changed successfully!');
+        setShowChangePassword(false);
+        setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+        setPasswordErrors({});
+      } else {
+        toast.error(response.message || 'Failed to change password');
+      }
+    } catch (error) {
+      console.error('Password change error:', error);
+      toast.error(error.message || 'Failed to change password');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCancel = () => {
     if (profileData) {
       setFormData({
@@ -166,6 +256,7 @@ const Profile = () => {
         email: profileData.email || '',
         phone: profileData.phone || '',
         dateOfBirth: profileData.dateOfBirth ? new Date(profileData.dateOfBirth).toISOString().split('T')[0] : '',
+        role: profileData.role || 'customer',
         address: {
           street: profileData.address?.street || '',
           city: profileData.address?.city || '',
@@ -176,6 +267,17 @@ const Profile = () => {
         drivingLicense: {
           number: profileData.drivingLicense?.number || '',
           expiryDate: profileData.drivingLicense?.expiryDate ? new Date(profileData.drivingLicense.expiryDate).toISOString().split('T')[0] : ''
+        },
+        ownerDetails: {
+          aadharNumber: profileData.ownerDetails?.aadharNumber || '',
+          panNumber: profileData.ownerDetails?.panNumber || '',
+          businessName: profileData.ownerDetails?.businessName || '',
+          businessLicense: profileData.ownerDetails?.businessLicense || '',
+          bankDetails: {
+            accountNumber: profileData.ownerDetails?.bankDetails?.accountNumber || '',
+            ifscCode: profileData.ownerDetails?.bankDetails?.ifscCode || '',
+            accountHolderName: profileData.ownerDetails?.bankDetails?.accountHolderName || ''
+          }
         }
       });
     }
@@ -213,15 +315,26 @@ const Profile = () => {
             )}
           </div>
           {!isEditing && (
-            <button
-              onClick={() => setIsEditing(true)}
-              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all font-medium shadow-lg flex items-center"
-            >
-              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-              Edit Profile
-            </button>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setShowChangePassword(true)}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all font-medium flex items-center"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                </svg>
+                Change Password
+              </button>
+              <button
+                onClick={() => setIsEditing(true)}
+                className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all font-medium shadow-lg flex items-center"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Edit Profile
+              </button>
+            </div>
           )}
         </div>
         
@@ -260,6 +373,14 @@ const Profile = () => {
                 {formData.email}
               </p>
               <div className="flex flex-wrap gap-2">
+                <span className={`px-3 py-1 text-xs font-medium rounded-full flex items-center ${
+                  formData.role === 'owner' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                }`}>
+                  <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                  </svg>
+                  {formData.role === 'owner' ? 'Bike Owner' : 'Customer'}
+                </span>
                 <span className="px-3 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 flex items-center">
                   <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -472,6 +593,110 @@ const Profile = () => {
                 placeholder="Country"
               />
             </div>
+            
+            {/* Owner-specific fields */}
+            {formData.role === 'owner' && (
+              <>
+                <div className="md:col-span-2">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">Owner Details</h3>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Aadhar Number
+                  </label>
+                  <input
+                    type="text"
+                    name="ownerDetails.aadharNumber"
+                    value={formData.ownerDetails.aadharNumber}
+                    onChange={handleInputChange}
+                    disabled={!isEditing}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
+                    placeholder="12-digit Aadhar number"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    PAN Number
+                  </label>
+                  <input
+                    type="text"
+                    name="ownerDetails.panNumber"
+                    value={formData.ownerDetails.panNumber}
+                    onChange={handleInputChange}
+                    disabled={!isEditing}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
+                    placeholder="ABCDE1234F"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Business Name
+                  </label>
+                  <input
+                    type="text"
+                    name="ownerDetails.businessName"
+                    value={formData.ownerDetails.businessName}
+                    onChange={handleInputChange}
+                    disabled={!isEditing}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
+                    placeholder="Your business name"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Business License
+                  </label>
+                  <input
+                    type="text"
+                    name="ownerDetails.businessLicense"
+                    value={formData.ownerDetails.businessLicense}
+                    onChange={handleInputChange}
+                    disabled={!isEditing}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
+                    placeholder="Business license number"
+                  />
+                </div>
+                
+                <div className="md:col-span-2">
+                  <h4 className="text-md font-medium text-gray-800 mb-3">Bank Details</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input
+                      type="text"
+                      name="ownerDetails.bankDetails.accountNumber"
+                      value={formData.ownerDetails.bankDetails.accountNumber}
+                      onChange={handleInputChange}
+                      disabled={!isEditing}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
+                      placeholder="Account Number"
+                    />
+                    <input
+                      type="text"
+                      name="ownerDetails.bankDetails.ifscCode"
+                      value={formData.ownerDetails.bankDetails.ifscCode}
+                      onChange={handleInputChange}
+                      disabled={!isEditing}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
+                      placeholder="IFSC Code"
+                    />
+                    <div className="md:col-span-2">
+                      <input
+                        type="text"
+                        name="ownerDetails.bankDetails.accountHolderName"
+                        value={formData.ownerDetails.bankDetails.accountHolderName}
+                        onChange={handleInputChange}
+                        disabled={!isEditing}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:bg-gray-50"
+                        placeholder="Account Holder Name"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
           
           {isEditing && (
@@ -506,6 +731,104 @@ const Profile = () => {
           )}
         </form>
         </div>
+        
+        {/* Change Password Modal */}
+        {showChangePassword && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+              <h3 className="text-lg font-semibold mb-4">Change Password</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Current Password
+                  </label>
+                  <input
+                    type="password"
+                    value={passwordData.currentPassword}
+                    onChange={(e) => {
+                      setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }));
+                      if (passwordErrors.currentPassword) {
+                        setPasswordErrors(prev => ({ ...prev, currentPassword: '' }));
+                      }
+                    }}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      passwordErrors.currentPassword ? 'border-red-300' : 'border-gray-300'
+                    }`}
+                  />
+                  {passwordErrors.currentPassword && (
+                    <p className="text-red-500 text-sm mt-1">{passwordErrors.currentPassword}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    New Password
+                  </label>
+                  <input
+                    type="password"
+                    value={passwordData.newPassword}
+                    onChange={(e) => {
+                      setPasswordData(prev => ({ ...prev, newPassword: e.target.value }));
+                      if (passwordErrors.newPassword) {
+                        setPasswordErrors(prev => ({ ...prev, newPassword: '' }));
+                      }
+                    }}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      passwordErrors.newPassword ? 'border-red-300' : 'border-gray-300'
+                    }`}
+                  />
+                  {passwordErrors.newPassword && (
+                    <p className="text-red-500 text-sm mt-1">{passwordErrors.newPassword}</p>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">
+                    Must contain uppercase, lowercase, number, and special character
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Confirm New Password
+                  </label>
+                  <input
+                    type="password"
+                    value={passwordData.confirmPassword}
+                    onChange={(e) => {
+                      setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }));
+                      if (passwordErrors.confirmPassword) {
+                        setPasswordErrors(prev => ({ ...prev, confirmPassword: '' }));
+                      }
+                    }}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      passwordErrors.confirmPassword ? 'border-red-300' : 'border-gray-300'
+                    }`}
+                  />
+                  {passwordErrors.confirmPassword && (
+                    <p className="text-red-500 text-sm mt-1">{passwordErrors.confirmPassword}</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowChangePassword(false);
+                    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                  }}
+                  className="px-4 py-2 text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleChangePassword}
+                  disabled={loading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center"
+                >
+                  {loading && (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  )}
+                  {loading ? 'Changing...' : 'Change Password'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

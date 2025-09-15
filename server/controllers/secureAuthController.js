@@ -202,7 +202,7 @@ const completeProfile = async (req, res) => {
     user.bio = bio || user.bio;
     user.hasPassword = true;
     user.isProfileComplete = true;
-    user.authProvider = 'email'; // Enable email login
+    // Keep authProvider as 'google' but enable email login with hasPassword flag
 
     await user.save();
 
@@ -240,49 +240,34 @@ const emailLogin = async (req, res) => {
 
     const { email, password } = value;
 
-    // Check if user exists in MongoDB (must have signed up with Google first)
-    const user = await User.findOne({ email });
+    // Get user with password for verification
+    const user = await User.findOne({ email }).select('+password');
     if (!user) {
       logger.warn('Email login attempt for non-existent user', { email });
       return res.status(401).json({
         success: false,
-        message: 'Please sign up with Google first before using email login'
-      });
-    }
-
-    if (!user.hasPassword) {
-      return res.status(401).json({
-        success: false,
-        message: 'Please complete your profile setup first'
-      });
-    }
-
-    // Check if user has password set
-    if (!user.hasPassword) {
-      return res.status(401).json({
-        success: false,
-        message: 'Please complete your profile setup first'
-      });
-    }
-
-    // Get user with password for verification
-    const userWithPassword = await User.findOne({ email }).select('+password');
-    if (!userWithPassword || !userWithPassword.password) {
-      return res.status(401).json({
-        success: false,
         message: 'Invalid email or password'
+      });
+    }
+
+    if (!user.hasPassword || !user.password) {
+      return res.status(401).json({
+        success: false,
+        message: 'Please complete your profile setup first'
       });
     }
 
     // Verify password
-    const isPasswordValid = await userWithPassword.comparePassword(password);
+    logger.info('Attempting password verification', { email, hasPassword: user.hasPassword, passwordExists: !!user.password });
+    const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
-      logger.warn('Invalid password attempt', { email });
+      logger.warn('Invalid password attempt', { email, hasPassword: user.hasPassword });
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
       });
     }
+    logger.info('Password verification successful', { email });
 
     // Update last login
     user.lastLogin = new Date();
@@ -322,6 +307,81 @@ const getCurrentUser = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch user data'
+    });
+  }
+};
+
+// Change password
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current password and new password are required'
+      });
+    }
+    
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be at least 8 characters long'
+      });
+    }
+    
+    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/.test(newPassword)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must contain uppercase, lowercase, number, and special character'
+      });
+    }
+    
+    const user = await User.findById(req.user.userId).select('+password');
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    if (!user.password) {
+      return res.status(400).json({
+        success: false,
+        message: 'No password set. Please complete profile setup first.'
+      });
+    }
+    
+    const isCurrentPasswordValid = await user.comparePassword(currentPassword);
+    if (!isCurrentPasswordValid) {
+      logger.warn('Invalid current password during change', { userId: req.user.userId });
+      return res.status(400).json({
+        success: false,
+        message: 'Current password is incorrect'
+      });
+    }
+    
+    logger.info('Changing password', { userId: req.user.userId, hasPasswordBefore: user.hasPassword });
+    user.password = newPassword;
+    user.hasPassword = true;
+    await user.save();
+    logger.info('Password changed', { userId: req.user.userId, hasPasswordAfter: user.hasPassword });
+    
+    logger.info('Password changed successfully', { userId: req.user.userId });
+    
+    res.json({
+      success: true,
+      message: 'Password changed successfully'
+    });
+    
+  } catch (error) {
+    logger.error('Change password error', { 
+      userId: req.user?.userId, 
+      error: error.message 
+    });
+    res.status(500).json({
+      success: false,
+      message: 'Failed to change password'
     });
   }
 };
@@ -427,5 +487,6 @@ module.exports = {
   emailLogin,
   getCurrentUser,
   updateProfile,
+  changePassword,
   logout
 };

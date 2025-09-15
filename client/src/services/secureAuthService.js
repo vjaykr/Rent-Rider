@@ -94,6 +94,19 @@ export const secureAuthService = {
     }
   },
 
+  // Change password
+  async changePassword(currentPassword, newPassword) {
+    try {
+      const response = await api.put('/auth/change-password', {
+        currentPassword,
+        newPassword
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { success: false, message: 'Network error' };
+    }
+  },
+
   // Check auth health
   async checkHealth() {
     try {

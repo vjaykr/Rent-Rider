@@ -12,7 +12,32 @@ const ProfileCompletion = () => {
     password: '',
     confirmPassword: '',
     phone: '',
-    bio: ''
+    bio: '',
+    role: 'customer',
+    // Customer fields
+    dateOfBirth: '',
+    address: {
+      street: '',
+      city: '',
+      state: '',
+      zipCode: ''
+    },
+    drivingLicense: {
+      number: '',
+      expiryDate: ''
+    },
+    // Owner fields
+    ownerDetails: {
+      aadharNumber: '',
+      panNumber: '',
+      businessName: '',
+      businessLicense: '',
+      bankDetails: {
+        accountNumber: '',
+        ifscCode: '',
+        accountHolderName: ''
+      }
+    }
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -44,13 +69,59 @@ const ProfileCompletion = () => {
       errors.bio = 'Bio cannot exceed 500 characters';
     }
     
+    // Role-specific validations
+    if (formData.role === 'owner') {
+      if (!formData.ownerDetails.aadharNumber) {
+        errors.aadharNumber = 'Aadhar number is required for owners';
+      } else if (!/^\d{12}$/.test(formData.ownerDetails.aadharNumber)) {
+        errors.aadharNumber = 'Please enter a valid 12-digit Aadhar number';
+      }
+      
+      if (!formData.ownerDetails.panNumber) {
+        errors.panNumber = 'PAN number is required for owners';
+      } else if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(formData.ownerDetails.panNumber)) {
+        errors.panNumber = 'Please enter a valid PAN number';
+      }
+      
+      if (!formData.ownerDetails.businessName) {
+        errors.businessName = 'Business name is required for owners';
+      }
+      
+      if (!formData.ownerDetails.bankDetails.accountNumber) {
+        errors.accountNumber = 'Account number is required for owners';
+      }
+      
+      if (!formData.ownerDetails.bankDetails.ifscCode) {
+        errors.ifscCode = 'IFSC code is required for owners';
+      }
+      
+      if (!formData.ownerDetails.bankDetails.accountHolderName) {
+        errors.accountHolderName = 'Account holder name is required for owners';
+      }
+    }
+    
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    if (name.includes('.')) {
+      const [parent, child, grandchild] = name.split('.');
+      setFormData(prev => ({
+        ...prev,
+        [parent]: {
+          ...prev[parent],
+          [child]: grandchild ? {
+            ...prev[parent][child],
+            [grandchild]: value
+          } : value
+        }
+      }));
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
     
     if (formErrors[name]) {
       setFormErrors(prev => ({ ...prev, [name]: '' }));
@@ -74,8 +145,13 @@ const ProfileCompletion = () => {
 
       const profileData = {
         password: formData.password,
+        role: formData.role,
         ...(formData.phone && { phone: formData.phone }),
-        ...(formData.bio && { bio: formData.bio })
+        ...(formData.bio && { bio: formData.bio }),
+        ...(formData.dateOfBirth && { dateOfBirth: formData.dateOfBirth }),
+        address: formData.address,
+        drivingLicense: formData.drivingLicense,
+        ...(formData.role === 'owner' && { ownerDetails: formData.ownerDetails })
       };
 
       const response = await completeProfile(profileData);
@@ -137,6 +213,48 @@ const ProfileCompletion = () => {
 
           <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
             <div className="space-y-4">
+              {/* Role Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  I want to use RentRider as: *
+                </label>
+                <div className="grid grid-cols-2 gap-4">
+                  <label className={`relative flex cursor-pointer rounded-lg border p-4 focus:outline-none ${
+                    formData.role === 'customer' ? 'border-blue-600 bg-blue-50' : 'border-gray-300'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="role"
+                      value="customer"
+                      checked={formData.role === 'customer'}
+                      onChange={handleInputChange}
+                      className="sr-only"
+                    />
+                    <div className="flex flex-col">
+                      <span className="block text-sm font-medium text-gray-900">Customer</span>
+                      <span className="block text-sm text-gray-500">Rent bikes from owners</span>
+                    </div>
+                  </label>
+                  
+                  <label className={`relative flex cursor-pointer rounded-lg border p-4 focus:outline-none ${
+                    formData.role === 'owner' ? 'border-blue-600 bg-blue-50' : 'border-gray-300'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="role"
+                      value="owner"
+                      checked={formData.role === 'owner'}
+                      onChange={handleInputChange}
+                      className="sr-only"
+                    />
+                    <div className="flex flex-col">
+                      <span className="block text-sm font-medium text-gray-900">Owner</span>
+                      <span className="block text-sm text-gray-500">List bikes for rent</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
               <div>
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                   Create Password *
@@ -225,6 +343,182 @@ const ProfileCompletion = () => {
                   <p className="mt-1 text-sm text-red-600">{formErrors.phone}</p>
                 )}
               </div>
+
+              {/* Common Fields */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="dateOfBirth" className="block text-sm font-medium text-gray-700">
+                    Date of Birth
+                  </label>
+                  <input
+                    id="dateOfBirth"
+                    name="dateOfBirth"
+                    type="date"
+                    value={formData.dateOfBirth}
+                    onChange={handleInputChange}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="drivingLicense.number" className="block text-sm font-medium text-gray-700">
+                    Driving License
+                  </label>
+                  <input
+                    id="drivingLicense.number"
+                    name="drivingLicense.number"
+                    type="text"
+                    value={formData.drivingLicense.number}
+                    onChange={handleInputChange}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    placeholder="License number"
+                  />
+                </div>
+              </div>
+
+              {/* Address Fields */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Address</label>
+                <div className="grid grid-cols-2 gap-4">
+                  <input
+                    name="address.street"
+                    type="text"
+                    value={formData.address.street}
+                    onChange={handleInputChange}
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    placeholder="Street Address"
+                  />
+                  <input
+                    name="address.city"
+                    type="text"
+                    value={formData.address.city}
+                    onChange={handleInputChange}
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    placeholder="City"
+                  />
+                  <input
+                    name="address.state"
+                    type="text"
+                    value={formData.address.state}
+                    onChange={handleInputChange}
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    placeholder="State"
+                  />
+                  <input
+                    name="address.zipCode"
+                    type="text"
+                    value={formData.address.zipCode}
+                    onChange={handleInputChange}
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    placeholder="ZIP Code"
+                  />
+                </div>
+              </div>
+
+              {/* Owner-specific fields */}
+              {formData.role === 'owner' && (
+                <div className="space-y-4 border-t pt-4">
+                  <h3 className="text-lg font-medium text-gray-900">Owner Details</h3>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="aadharNumber" className="block text-sm font-medium text-gray-700">
+                        Aadhar Number *
+                      </label>
+                      <input
+                        id="aadharNumber"
+                        name="ownerDetails.aadharNumber"
+                        type="text"
+                        value={formData.ownerDetails.aadharNumber}
+                        onChange={handleInputChange}
+                        className={`mt-1 block w-full px-3 py-2 border ${
+                          formErrors.aadharNumber ? 'border-red-300' : 'border-gray-300'
+                        } rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                        placeholder="12-digit Aadhar number"
+                      />
+                      {formErrors.aadharNumber && (
+                        <p className="mt-1 text-sm text-red-600">{formErrors.aadharNumber}</p>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="panNumber" className="block text-sm font-medium text-gray-700">
+                        PAN Number *
+                      </label>
+                      <input
+                        id="panNumber"
+                        name="ownerDetails.panNumber"
+                        type="text"
+                        value={formData.ownerDetails.panNumber}
+                        onChange={handleInputChange}
+                        className={`mt-1 block w-full px-3 py-2 border ${
+                          formErrors.panNumber ? 'border-red-300' : 'border-gray-300'
+                        } rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                        placeholder="ABCDE1234F"
+                      />
+                      {formErrors.panNumber && (
+                        <p className="mt-1 text-sm text-red-600">{formErrors.panNumber}</p>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label htmlFor="businessName" className="block text-sm font-medium text-gray-700">
+                      Business Name *
+                    </label>
+                    <input
+                      id="businessName"
+                      name="ownerDetails.businessName"
+                      type="text"
+                      value={formData.ownerDetails.businessName}
+                      onChange={handleInputChange}
+                      className={`mt-1 block w-full px-3 py-2 border ${
+                        formErrors.businessName ? 'border-red-300' : 'border-gray-300'
+                      } rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                      placeholder="Your business name"
+                    />
+                    {formErrors.businessName && (
+                      <p className="mt-1 text-sm text-red-600">{formErrors.businessName}</p>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Bank Details</label>
+                    <div className="grid grid-cols-2 gap-4">
+                      <input
+                        name="ownerDetails.bankDetails.accountNumber"
+                        type="text"
+                        value={formData.ownerDetails.bankDetails.accountNumber}
+                        onChange={handleInputChange}
+                        className={`block w-full px-3 py-2 border ${
+                          formErrors.accountNumber ? 'border-red-300' : 'border-gray-300'
+                        } rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                        placeholder="Account Number *"
+                      />
+                      <input
+                        name="ownerDetails.bankDetails.ifscCode"
+                        type="text"
+                        value={formData.ownerDetails.bankDetails.ifscCode}
+                        onChange={handleInputChange}
+                        className={`block w-full px-3 py-2 border ${
+                          formErrors.ifscCode ? 'border-red-300' : 'border-gray-300'
+                        } rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                        placeholder="IFSC Code *"
+                      />
+                    </div>
+                    <input
+                      name="ownerDetails.bankDetails.accountHolderName"
+                      type="text"
+                      value={formData.ownerDetails.bankDetails.accountHolderName}
+                      onChange={handleInputChange}
+                      className={`mt-2 block w-full px-3 py-2 border ${
+                        formErrors.accountHolderName ? 'border-red-300' : 'border-gray-300'
+                      } rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                      placeholder="Account Holder Name *"
+                    />
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label htmlFor="bio" className="block text-sm font-medium text-gray-700">
