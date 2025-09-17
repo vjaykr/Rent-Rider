@@ -326,7 +326,7 @@ const Home = () => {
             Welcome to Rydigo
           </h1>
           <p className="text-xl mb-8 max-w-3xl mx-auto">
-            Your trusted bike rental platform. Find and rent bikes easily and safely 
+            Your trusted vehicle rental platform. Find and rent vehicles easily and safely 
             from verified owners in your city.
           </p>
 
